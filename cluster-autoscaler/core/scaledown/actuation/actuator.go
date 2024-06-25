@@ -366,8 +366,10 @@ func (a *Actuator) createSnapshot(nodes []*apiv1.Node) (clustersnapshot.ClusterS
 	scheduledPods := kube_util.ScheduledPods(pods)
 	nonExpendableScheduledPods := utils.FilterOutExpendablePods(scheduledPods, a.ctx.ExpendablePodsPriorityCutoff)
 
+	// TODO(DRA): Plumb the DRA objects for the nodes and pods here, include them in the ResourceInfos. Similar snapshot initialization is done
+	// at the beginning of RunOnce - we should probably unify the logic.
 	for _, node := range nodes {
-		if err := snapshot.AddNode(node); err != nil {
+		if err := snapshot.AddNode(clustersnapshot.NodeResourceInfo{Node: node}); err != nil {
 			return nil, err
 		}
 
@@ -376,7 +378,7 @@ func (a *Actuator) createSnapshot(nodes []*apiv1.Node) (clustersnapshot.ClusterS
 
 	for _, pod := range nonExpendableScheduledPods {
 		if knownNodes[pod.Spec.NodeName] {
-			if err := snapshot.AddPod(pod, pod.Spec.NodeName); err != nil {
+			if err := snapshot.AddPod(clustersnapshot.PodResourceInfo{Pod: pod}, pod.Spec.NodeName); err != nil {
 				return nil, err
 			}
 		}

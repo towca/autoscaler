@@ -258,9 +258,10 @@ func (a *StaticAutoscaler) cleanUpIfRequired() {
 func (a *StaticAutoscaler) initializeClusterSnapshot(nodes []*apiv1.Node, scheduledPods []*apiv1.Pod) caerrors.AutoscalerError {
 	a.ClusterSnapshot.Clear()
 
+	// TODO(DRA): Include DRA objects in the ResourceInfos going to the snapshot.
 	knownNodes := make(map[string]bool)
 	for _, node := range nodes {
-		if err := a.ClusterSnapshot.AddNode(node); err != nil {
+		if err := a.ClusterSnapshot.AddNode(clustersnapshot.NodeResourceInfo{Node: node}); err != nil {
 			klog.Errorf("Failed to add node %s to cluster snapshot: %v", node.Name, err)
 			return caerrors.ToAutoscalerError(caerrors.InternalError, err)
 		}
@@ -268,7 +269,7 @@ func (a *StaticAutoscaler) initializeClusterSnapshot(nodes []*apiv1.Node, schedu
 	}
 	for _, pod := range scheduledPods {
 		if knownNodes[pod.Spec.NodeName] {
-			if err := a.ClusterSnapshot.AddPod(pod, pod.Spec.NodeName); err != nil {
+			if err := a.ClusterSnapshot.AddPod(clustersnapshot.PodResourceInfo{Pod: pod}, pod.Spec.NodeName); err != nil {
 				klog.Errorf("Failed to add pod %s scheduled to node %s to cluster snapshot: %v", pod.Name, pod.Spec.NodeName, err)
 				return caerrors.ToAutoscalerError(caerrors.InternalError, err)
 			}
@@ -486,11 +487,12 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 	// The fake nodes are intentionally not added to the all nodes list, so that they are not considered as candidates for scale-down (which
 	// doesn't make sense as they're not real).
 	for _, upcomingNode := range getUpcomingNodeInfos(upcomingCounts, nodeInfosForGroups) {
-		var pods []*apiv1.Pod
+		// TODO(DRA): Copy DRA objects from the template Node and its Pods into the ResourceInfos before adding to snapshot.
+		var pods []clustersnapshot.PodResourceInfo
 		for _, podInfo := range upcomingNode.Pods {
-			pods = append(pods, podInfo.Pod)
+			pods = append(pods, clustersnapshot.PodResourceInfo{Pod: podInfo.Pod})
 		}
-		err = a.ClusterSnapshot.AddNodeWithPods(upcomingNode.Node(), pods)
+		err = a.ClusterSnapshot.AddNodeWithPods(clustersnapshot.NodeResourceInfo{Node: upcomingNode.Node()}, pods)
 		if err != nil {
 			klog.Errorf("Failed to add upcoming node %s to cluster snapshot: %v", upcomingNode.Node().Name, err)
 			return caerrors.ToAutoscalerError(caerrors.InternalError, err)
