@@ -211,11 +211,12 @@ func (e *BinpackingNodeEstimator) addNewNodeToSnapshot(
 	template *schedulerframework.NodeInfo,
 ) error {
 	newNodeInfo := scheduler.DeepCopyTemplateNode(template, fmt.Sprintf("e-%d", estimationState.newNodeNameIndex))
-	var pods []*apiv1.Pod
+	// TODO(DRA): Copy DRA objects from the template Node and its Pods into the ResourceInfos before adding to snapshot.
+	var pods []clustersnapshot.PodResourceInfo
 	for _, podInfo := range newNodeInfo.Pods {
-		pods = append(pods, podInfo.Pod)
+		pods = append(pods, clustersnapshot.PodResourceInfo{Pod: podInfo.Pod})
 	}
-	if err := e.clusterSnapshot.AddNodeWithPods(newNodeInfo.Node(), pods); err != nil {
+	if err := e.clusterSnapshot.AddNodeWithPods(clustersnapshot.NodeResourceInfo{Node: newNodeInfo.Node()}, pods); err != nil {
 		return err
 	}
 	estimationState.newNodeNameIndex++
@@ -229,7 +230,8 @@ func (e *BinpackingNodeEstimator) tryToAddNode(
 	pod *apiv1.Pod,
 	nodeName string,
 ) error {
-	if err := e.clusterSnapshot.AddPod(pod, nodeName); err != nil {
+	// TODO(DRA): Plumb the pod's DRA objects here, include them in PodResourceInfo.
+	if err := e.clusterSnapshot.AddPod(clustersnapshot.PodResourceInfo{Pod: pod}, nodeName); err != nil {
 		return fmt.Errorf("Error adding pod %v.%v to node %v in ClusterSnapshot; %v", pod.Namespace, pod.Name, nodeName, err)
 	}
 	estimationState.newNodesWithPods[nodeName] = true

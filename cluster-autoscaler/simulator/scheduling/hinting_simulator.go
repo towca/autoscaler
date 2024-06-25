@@ -73,7 +73,8 @@ func (s *HintingSimulator) TrySchedulePods(clusterSnapshot clustersnapshot.Clust
 
 		if nodeName != "" {
 			klogx.V(4).UpTo(loggingQuota).Infof("Pod %s/%s can be moved to %s", pod.Namespace, pod.Name, nodeName)
-			if err := clusterSnapshot.AddPod(pod, nodeName); err != nil {
+			// TODO(DRA): Plumb the pod DRA objects here, include them in the ResourceInfo going to the snapshot.
+			if err := clusterSnapshot.AddPod(clustersnapshot.PodResourceInfo{Pod: pod}, nodeName); err != nil {
 				return nil, 0, fmt.Errorf("simulating scheduling of %s/%s to %s return error; %v", pod.Namespace, pod.Name, nodeName, err)
 			}
 			statuses = append(statuses, Status{Pod: pod, NodeName: nodeName})
