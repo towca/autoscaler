@@ -26,6 +26,8 @@ import (
 // InitializeClusterSnapshotOrDie clears cluster snapshot and then initializes it with given set of nodes and pods.
 // Both Spec.NodeName and Status.NominatedNodeName are used when simulating scheduling pods.
 func InitializeClusterSnapshotOrDie(
+	// TODO(DRA): Evaluate whether we need to update the tests calling this with something DRA-related, or maybe provide
+	// an equivalent function for tests that need to simulate DRA.
 	t *testing.T,
 	snapshot ClusterSnapshot,
 	nodes []*apiv1.Node,
@@ -35,19 +37,35 @@ func InitializeClusterSnapshotOrDie(
 	snapshot.Clear()
 
 	for _, node := range nodes {
-		err = snapshot.AddNode(node)
+		err = snapshot.AddNode(NodeResourceInfo{Node: node})
 		assert.NoError(t, err, "error while adding node %s", node.Name)
 	}
 
 	for _, pod := range pods {
 		if pod.Spec.NodeName != "" {
-			err = snapshot.AddPod(pod, pod.Spec.NodeName)
+			err = snapshot.AddPod(PodResourceInfo{Pod: pod}, pod.Spec.NodeName)
 			assert.NoError(t, err, "error while adding pod %s/%s to node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
 		} else if pod.Status.NominatedNodeName != "" {
-			err = snapshot.AddPod(pod, pod.Status.NominatedNodeName)
+			err = snapshot.AddPod(PodResourceInfo{Pod: pod}, pod.Status.NominatedNodeName)
 			assert.NoError(t, err, "error while adding pod %s/%s to nominated node %s", pod.Namespace, pod.Name, pod.Status.NominatedNodeName)
 		} else {
 			assert.Fail(t, "pod %s/%s does not have Spec.NodeName nor Status.NominatedNodeName set", pod.Namespace, pod.Name)
 		}
 	}
+}
+
+func WrapPodsInResourceInfos(pods []*apiv1.Pod) []PodResourceInfo {
+	var result []PodResourceInfo
+	for _, pod := range pods {
+		result = append(result, PodResourceInfo{Pod: pod})
+	}
+	return result
+}
+
+func WrapNodesInResourceInfos(nodes []*apiv1.Node) []NodeResourceInfo {
+	var result []NodeResourceInfo
+	for _, node := range nodes {
+		result = append(result, NodeResourceInfo{Node: node})
+	}
+	return result
 }
