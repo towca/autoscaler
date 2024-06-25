@@ -142,17 +142,17 @@ func (data *internalBasicSnapshotData) clone() *internalBasicSnapshotData {
 	}
 }
 
-func (data *internalBasicSnapshotData) addNode(node *apiv1.Node) error {
-	if _, found := data.nodeInfoMap[node.Name]; found {
-		return fmt.Errorf("node %s already in snapshot", node.Name)
+func (data *internalBasicSnapshotData) addNode(node NodeResourceInfo) error {
+	if _, found := data.nodeInfoMap[node.Node.Name]; found {
+		return fmt.Errorf("node %s already in snapshot", node.Node.Name)
 	}
 	nodeInfo := schedulerframework.NewNodeInfo()
-	nodeInfo.SetNode(node)
-	data.nodeInfoMap[node.Name] = nodeInfo
+	nodeInfo.SetNode(node.Node)
+	data.nodeInfoMap[node.Node.Name] = nodeInfo
 	return nil
 }
 
-func (data *internalBasicSnapshotData) addNodes(nodes []*apiv1.Node) error {
+func (data *internalBasicSnapshotData) addNodes(nodes []NodeResourceInfo) error {
 	for _, node := range nodes {
 		if err := data.addNode(node); err != nil {
 			return err
@@ -172,12 +172,12 @@ func (data *internalBasicSnapshotData) removeNode(nodeName string) error {
 	return nil
 }
 
-func (data *internalBasicSnapshotData) addPod(pod *apiv1.Pod, nodeName string) error {
+func (data *internalBasicSnapshotData) addPod(pod PodResourceInfo, nodeName string) error {
 	if _, found := data.nodeInfoMap[nodeName]; !found {
 		return ErrNodeNotFound
 	}
-	data.nodeInfoMap[nodeName].AddPod(pod)
-	data.addPvcUsedByPod(pod)
+	data.nodeInfoMap[nodeName].AddPod(pod.Pod)
+	data.addPvcUsedByPod(pod.Pod)
 	return nil
 }
 
@@ -213,22 +213,22 @@ func (snapshot *BasicClusterSnapshot) getInternalData() *internalBasicSnapshotDa
 }
 
 // AddNode adds node to the snapshot.
-func (snapshot *BasicClusterSnapshot) AddNode(node *apiv1.Node) error {
+func (snapshot *BasicClusterSnapshot) AddNode(node NodeResourceInfo) error {
 	return snapshot.getInternalData().addNode(node)
 }
 
 // AddNodes adds nodes in batch to the snapshot.
-func (snapshot *BasicClusterSnapshot) AddNodes(nodes []*apiv1.Node) error {
+func (snapshot *BasicClusterSnapshot) AddNodes(nodes []NodeResourceInfo) error {
 	return snapshot.getInternalData().addNodes(nodes)
 }
 
 // AddNodeWithPods adds a node and set of pods to be scheduled to this node to the snapshot.
-func (snapshot *BasicClusterSnapshot) AddNodeWithPods(node *apiv1.Node, pods []*apiv1.Pod) error {
+func (snapshot *BasicClusterSnapshot) AddNodeWithPods(node NodeResourceInfo, pods []PodResourceInfo) error {
 	if err := snapshot.AddNode(node); err != nil {
 		return err
 	}
 	for _, pod := range pods {
-		if err := snapshot.AddPod(pod, node.Name); err != nil {
+		if err := snapshot.AddPod(pod, node.Node.Name); err != nil {
 			return err
 		}
 	}
@@ -241,7 +241,7 @@ func (snapshot *BasicClusterSnapshot) RemoveNode(nodeName string) error {
 }
 
 // AddPod adds pod to the snapshot and schedules it to given node.
-func (snapshot *BasicClusterSnapshot) AddPod(pod *apiv1.Pod, nodeName string) error {
+func (snapshot *BasicClusterSnapshot) AddPod(pod PodResourceInfo, nodeName string) error {
 	return snapshot.getInternalData().addPod(pod, nodeName)
 }
 

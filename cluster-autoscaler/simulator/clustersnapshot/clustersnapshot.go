@@ -20,26 +20,57 @@ import (
 	"errors"
 
 	apiv1 "k8s.io/api/core/v1"
+	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
 	"k8s.io/klog/v2"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
+
+// NodeDynamicResources contains objects associated with a Node that define some of the Node's resources outside the
+// Node object itself. Scheduler needs to evaluate both the Node and the associated objects to decide if certain pods
+// can be scheduled. Because of this, CA has to simulate the associated objects along the Node. All fields are optional,
+// nothing set means that there aren't any associated objects.
+type NodeDynamicResources struct {
+	ResourceSlicesV1Alpha2 []*resourcev1alpha2.ResourceSlice
+}
+
+// NodeResourceInfo contains all information about a Node and its associated resources needed by the scheduler.
+type NodeResourceInfo struct {
+	Node             *apiv1.Node
+	DynamicResources NodeDynamicResources
+}
+
+// PodDynamicResourceRequests contains objects associated with a Pod that define some of the Pod's resource requests
+// outside the Pod object itself. Scheduler needs this information for scheduled pods to know how much of
+// the dynamic resources are reserved on the Pod's Node during subsequent scheduling attempts. Scheduler also needs this
+// information for pending pods to evaluate whether a given Node has enough resources to satisfy the requests. All fields are
+// optional, nothing set means that there aren't any associated objects.
+type PodDynamicResourceRequests struct {
+	ResourceClaimsV1Alpha2          []*resourcev1alpha2.ResourceClaim
+	ResourceClaimParametersV1Alpha2 []*resourcev1alpha2.ResourceClaimParameters
+}
+
+// PodResourceInfo contains all information about a Pod and its associated resource requests needed by the scheduler.
+type PodResourceInfo struct {
+	Pod                     *apiv1.Pod
+	DynamicResourceRequests PodDynamicResourceRequests
+}
 
 // ClusterSnapshot is abstraction of cluster state used for predicate simulations.
 // It exposes mutation methods and can be viewed as scheduler's SharedLister.
 type ClusterSnapshot interface {
 	schedulerframework.SharedLister
 	// AddNode adds node to the snapshot.
-	AddNode(node *apiv1.Node) error
+	AddNode(node NodeResourceInfo) error
 	// AddNodes adds nodes to the snapshot.
-	AddNodes(nodes []*apiv1.Node) error
-	// RemoveNode removes nodes (and pods scheduled to it) from the snapshot.
+	AddNodes(nodes []NodeResourceInfo) error
+	// RemoveNode removes a Node (as well as all associated info like its pods and dynamic resources) from the snapshot.
 	RemoveNode(nodeName string) error
 	// AddPod adds pod to the snapshot and schedules it to given node.
-	AddPod(pod *apiv1.Pod, nodeName string) error
-	// RemovePod removes pod from the snapshot.
+	AddPod(pod PodResourceInfo, nodeName string) error
+	// RemovePod removes a pod (as well as all associated info like its dynamic resource requests) from the snapshot.
 	RemovePod(namespace string, podName string, nodeName string) error
 	// AddNodeWithPods adds a node and set of pods to be scheduled to this node to the snapshot.
-	AddNodeWithPods(node *apiv1.Node, pods []*apiv1.Pod) error
+	AddNodeWithPods(node NodeResourceInfo, pods []PodResourceInfo) error
 	// IsPVCUsedByPods returns if the pvc is used by any pod, key = <namespace>/<pvc_name>
 	IsPVCUsedByPods(key string) bool
 
