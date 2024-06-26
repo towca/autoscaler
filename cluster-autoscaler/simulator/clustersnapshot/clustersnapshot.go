@@ -77,6 +77,15 @@ type ClusterSnapshot interface {
 	Clear()
 }
 
+// Handle groups together everything needed to use the snapshot.
+type Handle struct {
+	ClusterSnapshot
+	// DraObjectsSource should hold a snapshot of all DRA-related objects taken at the beginning of the loop (at the same time when pods
+	// and nodes are snapshot). It's needed whenever _real_ (as opposed to the ones we fake in-memory) nodes and pods are added to the
+	// snapshot, so that their DRA objects are added as well.
+	DraObjectsSource dynamicresources.Snapshot
+}
+
 // ErrNodeNotFound means that a node wasn't found in the snapshot.
 var ErrNodeNotFound = errors.New("node not found")
 

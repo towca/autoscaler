@@ -112,7 +112,7 @@ func TestFilterOutExpendable(t *testing.T) {
 			snapshot.AddNodes(clustersnapshot.WrapNodesInResourceInfos(tc.nodes))
 
 			pods, err := processor.Process(&context.AutoscalingContext{
-				ClusterSnapshot: snapshot,
+				ClusterSnapshot: &clustersnapshot.Handle{ClusterSnapshot: snapshot},
 				AutoscalingOptions: config.AutoscalingOptions{
 					ExpendablePodsPriorityCutoff: tc.priorityCutoff,
 				},
