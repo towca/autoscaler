@@ -94,7 +94,7 @@ const (
 // RemovalSimulator is a helper object for simulating node removal scenarios.
 type RemovalSimulator struct {
 	listers             kube_util.ListerRegistry
-	clusterSnapshot     clustersnapshot.ClusterSnapshot
+	clusterSnapshot     *clustersnapshot.Handle
 	usageTracker        *UsageTracker
 	canPersist          bool
 	deleteOptions       options.NodeDeleteOptions
@@ -103,7 +103,7 @@ type RemovalSimulator struct {
 }
 
 // NewRemovalSimulator returns a new RemovalSimulator.
-func NewRemovalSimulator(listers kube_util.ListerRegistry, clusterSnapshot clustersnapshot.ClusterSnapshot, predicateChecker predicatechecker.PredicateChecker,
+func NewRemovalSimulator(listers kube_util.ListerRegistry, clusterSnapshot *clustersnapshot.Handle, predicateChecker predicatechecker.PredicateChecker,
 	usageTracker *UsageTracker, deleteOptions options.NodeDeleteOptions, drainabilityRules rules.Rules, persistSuccessfulSimulations bool) *RemovalSimulator {
 	return &RemovalSimulator{
 		listers:             listers,
