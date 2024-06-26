@@ -22,6 +22,7 @@ import (
 	"testing"
 	"time"
 
+	"k8s.io/autoscaler/cluster-autoscaler/dynamicresources"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/nodegroupconfig"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/nodegroups/asyncnodegroups"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator"
@@ -1296,6 +1297,6 @@ func newWrapperForTesting(ctx *context.AutoscalingContext, clusterStateRegistry 
 	}
 	processors := NewTestProcessors(ctx)
 	sd := NewScaleDown(ctx, processors, ndt, deleteOptions, nil)
-	actuator := actuation.NewActuator(ctx, clusterStateRegistry, ndt, deleteOptions, nil, processors.NodeGroupConfigProcessor)
+	actuator := actuation.NewActuator(ctx, clusterStateRegistry, ndt, deleteOptions, nil, processors.NodeGroupConfigProcessor, &dynamicresources.Provider{})
 	return NewScaleDownWrapper(sd, actuator)
 }
