@@ -31,7 +31,7 @@ import (
 // BinpackingNodeEstimator estimates the number of needed nodes to handle the given amount of pods.
 type BinpackingNodeEstimator struct {
 	predicateChecker       predicatechecker.PredicateChecker
-	clusterSnapshot        clustersnapshot.ClusterSnapshot
+	clusterSnapshot        *clustersnapshot.Handle
 	limiter                EstimationLimiter
 	podOrderer             EstimationPodOrderer
 	context                EstimationContext
@@ -51,7 +51,7 @@ type estimationState struct {
 // NewBinpackingNodeEstimator builds a new BinpackingNodeEstimator.
 func NewBinpackingNodeEstimator(
 	predicateChecker predicatechecker.PredicateChecker,
-	clusterSnapshot clustersnapshot.ClusterSnapshot,
+	clusterSnapshot *clustersnapshot.Handle,
 	limiter EstimationLimiter,
 	podOrderer EstimationPodOrderer,
 	context EstimationContext,
@@ -230,8 +230,7 @@ func (e *BinpackingNodeEstimator) tryToAddNode(
 	pod *apiv1.Pod,
 	nodeName string,
 ) error {
-	// TODO(DRA): Plumb the pod's DRA objects here, include them in PodResourceInfo.
-	if err := e.clusterSnapshot.AddPod(clustersnapshot.PodResourceInfo{Pod: pod}, nodeName); err != nil {
+	if err := e.clusterSnapshot.AddPod(clustersnapshot.NewPodResourceInfo(pod, e.clusterSnapshot.DraObjectsSource), nodeName); err != nil {
 		return fmt.Errorf("Error adding pod %v.%v to node %v in ClusterSnapshot; %v", pod.Namespace, pod.Name, nodeName, err)
 	}
 	estimationState.newNodesWithPods[nodeName] = true
