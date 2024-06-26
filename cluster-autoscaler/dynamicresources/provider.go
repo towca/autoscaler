@@ -12,7 +12,7 @@ type v1Alpha2Listers struct {
 	resourceSlices          listersv1alpha2.ResourceSliceLister
 }
 
-func (l v1Alpha2Listers) snapshot() (snapshotV1alpha2, error) {
+func (l *v1Alpha2Listers) snapshot() (snapshotV1alpha2, error) {
 	claims, err := l.resourceClaims.List(labels.Everything())
 	if err != nil {
 		return snapshotV1alpha2{}, err
@@ -32,14 +32,14 @@ func (l v1Alpha2Listers) snapshot() (snapshotV1alpha2, error) {
 	}, nil
 }
 
-// Provider provides DRA-related objects.
+// Provider provides DRA-related objects. Zero-value Provider object provides no objects, it can be used e.g. in tests.
 type Provider struct {
-	v1a2Listers v1Alpha2Listers
+	v1a2Listers *v1Alpha2Listers
 }
 
 func NewProvider(informerFactory informers.SharedInformerFactory) *Provider {
 	return &Provider{
-		v1a2Listers: v1Alpha2Listers{
+		v1a2Listers: &v1Alpha2Listers{
 			resourceClaims:          informerFactory.Resource().V1alpha2().ResourceClaims().Lister(),
 			resourceClaimParameters: informerFactory.Resource().V1alpha2().ResourceClaimParameters().Lister(),
 			resourceSlices:          informerFactory.Resource().V1alpha2().ResourceSlices().Lister(),
@@ -48,11 +48,13 @@ func NewProvider(informerFactory informers.SharedInformerFactory) *Provider {
 }
 
 func (m *Provider) Snapshot() (Snapshot, error) {
-	v1a2Snapshot, err := m.v1a2Listers.snapshot()
-	if err != nil {
-		return Snapshot{}, err
+	snapshot := Snapshot{}
+	if m.v1a2Listers != nil {
+		snapshotV1a2, err := m.v1a2Listers.snapshot()
+		if err != nil {
+			return Snapshot{}, err
+		}
+		snapshot.snapshotV1a2 = snapshotV1a2
 	}
-	return Snapshot{
-		snapshotV1a2: v1a2Snapshot,
-	}, nil
+	return snapshot, nil
 }
