@@ -138,7 +138,7 @@ func TestTrySchedulePods(t *testing.T) {
 			assert.NoError(t, err)
 			clustersnapshot.InitializeClusterSnapshotOrDie(t, clusterSnapshot, tc.nodes, tc.pods)
 			s := NewHintingSimulator(predicateChecker)
-			statuses, _, err := s.TrySchedulePods(clusterSnapshot, tc.newPods, tc.acceptableNodes, false)
+			statuses, _, err := s.TrySchedulePods(&clustersnapshot.Handle{ClusterSnapshot: clusterSnapshot}, tc.newPods, tc.acceptableNodes, false)
 			if tc.wantErr {
 				assert.Error(t, err)
 				return
@@ -227,7 +227,7 @@ func TestPodSchedulesOnHintedNode(t *testing.T) {
 				s.hints.Set(HintKeyFromPod(pod), n)
 				expectedStatuses = append(expectedStatuses, Status{Pod: pod, NodeName: n})
 			}
-			statuses, _, err := s.TrySchedulePods(clusterSnapshot, pods, ScheduleAnywhere, false)
+			statuses, _, err := s.TrySchedulePods(&clustersnapshot.Handle{ClusterSnapshot: clusterSnapshot}, pods, ScheduleAnywhere, false)
 			assert.NoError(t, err)
 			assert.Equal(t, expectedStatuses, statuses)
 

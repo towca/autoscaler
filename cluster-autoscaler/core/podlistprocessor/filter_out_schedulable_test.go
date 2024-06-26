@@ -195,7 +195,7 @@ func TestFilterOutSchedulable(t *testing.T) {
 			clusterSnapshot.Fork()
 
 			processor := NewFilterOutSchedulablePodListProcessor(predicateChecker, tc.nodeFilter)
-			unschedulablePods, err := processor.filterOutSchedulableByPacking(tc.unschedulableCandidates, clusterSnapshot)
+			unschedulablePods, err := processor.filterOutSchedulableByPacking(tc.unschedulableCandidates, &clustersnapshot.Handle{ClusterSnapshot: clusterSnapshot})
 
 			assert.NoError(t, err)
 			assert.ElementsMatch(t, unschedulablePods, tc.expectedUnscheduledPods, "unschedulable pods differ")
@@ -296,7 +296,7 @@ func BenchmarkFilterOutSchedulable(b *testing.B) {
 
 				for i := 0; i < b.N; i++ {
 					processor := NewFilterOutSchedulablePodListProcessor(predicateChecker, scheduling.ScheduleAnywhere)
-					if stillPending, err := processor.filterOutSchedulableByPacking(pendingPods, clusterSnapshot); err != nil {
+					if stillPending, err := processor.filterOutSchedulableByPacking(pendingPods, &clustersnapshot.Handle{ClusterSnapshot: clusterSnapshot}); err != nil {
 						assert.NoError(b, err)
 					} else if len(stillPending) < tc.pendingPods {
 						assert.Equal(b, len(stillPending), tc.pendingPods)

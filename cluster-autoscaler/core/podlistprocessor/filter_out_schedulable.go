@@ -95,7 +95,7 @@ func (p *filterOutSchedulablePodListProcessor) CleanUp() {
 // unschedulable can be scheduled on free capacity on existing nodes by trying to pack the pods. It
 // tries to pack the higher priority pods first. It takes into account pods that are bound to node
 // and will be scheduled after lower priority pod preemption.
-func (p *filterOutSchedulablePodListProcessor) filterOutSchedulableByPacking(unschedulableCandidates []*apiv1.Pod, clusterSnapshot clustersnapshot.ClusterSnapshot) ([]*apiv1.Pod, error) {
+func (p *filterOutSchedulablePodListProcessor) filterOutSchedulableByPacking(unschedulableCandidates []*apiv1.Pod, clusterSnapshot *clustersnapshot.Handle) ([]*apiv1.Pod, error) {
 	// Sort unschedulable pods by importance
 	sort.Slice(unschedulableCandidates, func(i, j int) bool {
 		return corev1helpers.PodPriority(unschedulableCandidates[i]) > corev1helpers.PodPriority(unschedulableCandidates[j])
