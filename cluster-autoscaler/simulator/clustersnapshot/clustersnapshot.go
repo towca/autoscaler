@@ -20,39 +20,31 @@ import (
 	"errors"
 
 	apiv1 "k8s.io/api/core/v1"
-	resourcev1alpha2 "k8s.io/api/resource/v1alpha2"
+	"k8s.io/autoscaler/cluster-autoscaler/dynamicresources"
 	"k8s.io/klog/v2"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
-// NodeDynamicResources contains objects associated with a Node that define some of the Node's resources outside the
-// Node object itself. Scheduler needs to evaluate both the Node and the associated objects to decide if certain pods
-// can be scheduled. Because of this, CA has to simulate the associated objects along the Node. All fields are optional,
-// nothing set means that there aren't any associated objects.
-type NodeDynamicResources struct {
-	ResourceSlicesV1Alpha2 []*resourcev1alpha2.ResourceSlice
-}
-
 // NodeResourceInfo contains all information about a Node and its associated resources needed by the scheduler.
 type NodeResourceInfo struct {
 	Node             *apiv1.Node
-	DynamicResources NodeDynamicResources
-}
-
-// PodDynamicResourceRequests contains objects associated with a Pod that define some of the Pod's resource requests
-// outside the Pod object itself. Scheduler needs this information for scheduled pods to know how much of
-// the dynamic resources are reserved on the Pod's Node during subsequent scheduling attempts. Scheduler also needs this
-// information for pending pods to evaluate whether a given Node has enough resources to satisfy the requests. All fields are
-// optional, nothing set means that there aren't any associated objects.
-type PodDynamicResourceRequests struct {
-	ResourceClaimsV1Alpha2          []*resourcev1alpha2.ResourceClaim
-	ResourceClaimParametersV1Alpha2 []*resourcev1alpha2.ResourceClaimParameters
+	DynamicResources dynamicresources.NodeDynamicResources
 }
 
 // PodResourceInfo contains all information about a Pod and its associated resource requests needed by the scheduler.
 type PodResourceInfo struct {
 	Pod                     *apiv1.Pod
-	DynamicResourceRequests PodDynamicResourceRequests
+	DynamicResourceRequests dynamicresources.PodDynamicResourceRequests
+}
+
+// NewNodeResourceInfo combines a node with its associated DRA objects.
+func NewNodeResourceInfo(node *apiv1.Node, draObjects dynamicresources.Snapshot) NodeResourceInfo {
+	return NodeResourceInfo{Node: node, DynamicResources: draObjects.NodeResources(node)}
+}
+
+// NewPodResourceInfo combines a pod with its associated DRA objects.
+func NewPodResourceInfo(pod *apiv1.Pod, draObjects dynamicresources.Snapshot) PodResourceInfo {
+	return PodResourceInfo{Pod: pod, DynamicResourceRequests: draObjects.PodResourceRequests(pod)}
 }
 
 // ClusterSnapshot is abstraction of cluster state used for predicate simulations.
