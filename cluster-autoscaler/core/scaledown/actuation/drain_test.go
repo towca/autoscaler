@@ -687,7 +687,7 @@ func TestPodsToEvict(t *testing.T) {
 				t.Errorf("AddNodeWithPods unexpected error: %v", err)
 			}
 			ctx := &acontext.AutoscalingContext{
-				ClusterSnapshot: snapshot,
+				ClusterSnapshot: &clustersnapshot.Handle{ClusterSnapshot: snapshot},
 				AutoscalingOptions: config.AutoscalingOptions{
 					DaemonSetEvictionForOccupiedNodes: !tc.dsEvictionDisabled,
 				},

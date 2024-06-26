@@ -233,7 +233,7 @@ func NewScaleTestAutoscalingContext(
 		},
 		CloudProvider:        provider,
 		PredicateChecker:     predicateChecker,
-		ClusterSnapshot:      clusterSnapshot,
+		ClusterSnapshot:      &clustersnapshot.Handle{ClusterSnapshot: clusterSnapshot},
 		ExpanderStrategy:     random.NewStrategy(),
 		ProcessorCallbacks:   processorCallbacks,
 		DebuggingSnapshotter: debuggingSnapshotter,

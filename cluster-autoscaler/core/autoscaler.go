@@ -27,6 +27,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaledown/pdb"
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaleup"
 	"k8s.io/autoscaler/cluster-autoscaler/debuggingsnapshot"
+	"k8s.io/autoscaler/cluster-autoscaler/dynamicresources"
 	"k8s.io/autoscaler/cluster-autoscaler/estimator"
 	"k8s.io/autoscaler/cluster-autoscaler/expander"
 	"k8s.io/autoscaler/cluster-autoscaler/expander/factory"
@@ -61,6 +62,7 @@ type AutoscalerOptions struct {
 	ScaleUpOrchestrator    scaleup.Orchestrator
 	DeleteOptions          options.NodeDeleteOptions
 	DrainabilityRules      rules.Rules
+	DraProvider            *dynamicresources.Provider
 }
 
 // Autoscaler is the main component of CA which scales up/down node groups according to its configuration
@@ -100,6 +102,7 @@ func NewAutoscaler(opts AutoscalerOptions, informerFactory informers.SharedInfor
 		opts.ScaleUpOrchestrator,
 		opts.DeleteOptions,
 		opts.DrainabilityRules,
+		opts.DraProvider,
 	), nil
 }
 
@@ -155,6 +158,9 @@ func initializeDefaultOptions(opts *AutoscalerOptions, informerFactory informers
 	}
 	if opts.DrainabilityRules == nil {
 		opts.DrainabilityRules = rules.Default(opts.DeleteOptions)
+	}
+	if opts.DraProvider == nil {
+		opts.DraProvider = dynamicresources.NewProvider(informerFactory)
 	}
 
 	return nil

@@ -267,7 +267,7 @@ func TestCurrentlyDrainedNodesPodListProcessor(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := context.AutoscalingContext{
 				ScaleDownActuator: &mockActuator{&mockActuationStatus{tc.drainedNodes}},
-				ClusterSnapshot:   clustersnapshot.NewBasicClusterSnapshot(),
+				ClusterSnapshot:   &clustersnapshot.Handle{ClusterSnapshot: clustersnapshot.NewBasicClusterSnapshot()},
 			}
 			clustersnapshot.InitializeClusterSnapshotOrDie(t, ctx.ClusterSnapshot, tc.nodes, tc.pods)
 

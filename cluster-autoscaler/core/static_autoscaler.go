@@ -30,6 +30,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaleup"
 	orchestrator "k8s.io/autoscaler/cluster-autoscaler/core/scaleup/orchestrator"
 	"k8s.io/autoscaler/cluster-autoscaler/debuggingsnapshot"
+	"k8s.io/autoscaler/cluster-autoscaler/dynamicresources"
 	kube_util "k8s.io/autoscaler/cluster-autoscaler/utils/kubernetes"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/taints"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
@@ -95,6 +96,7 @@ type StaticAutoscaler struct {
 	processorCallbacks      *staticAutoscalerProcessorCallbacks
 	initialized             bool
 	taintConfig             taints.TaintConfig
+	draProvider             *dynamicresources.Provider
 }
 
 type staticAutoscalerProcessorCallbacks struct {
@@ -147,7 +149,8 @@ func NewStaticAutoscaler(
 	remainingPdbTracker pdb.RemainingPdbTracker,
 	scaleUpOrchestrator scaleup.Orchestrator,
 	deleteOptions options.NodeDeleteOptions,
-	drainabilityRules rules.Rules) *StaticAutoscaler {
+	drainabilityRules rules.Rules,
+	draProvider *dynamicresources.Provider) *StaticAutoscaler {
 
 	clusterStateConfig := clusterstate.ClusterStateRegistryConfig{
 		MaxTotalUnreadyPercentage: opts.MaxTotalUnreadyPercentage,
@@ -212,6 +215,7 @@ func NewStaticAutoscaler(
 		processorCallbacks:      processorCallbacks,
 		clusterStateRegistry:    clusterStateRegistry,
 		taintConfig:             taintConfig,
+		draProvider:             draProvider,
 	}
 }
 
@@ -258,10 +262,9 @@ func (a *StaticAutoscaler) cleanUpIfRequired() {
 func (a *StaticAutoscaler) initializeClusterSnapshot(nodes []*apiv1.Node, scheduledPods []*apiv1.Pod) caerrors.AutoscalerError {
 	a.ClusterSnapshot.Clear()
 
-	// TODO(DRA): Include DRA objects in the ResourceInfos going to the snapshot.
 	knownNodes := make(map[string]bool)
 	for _, node := range nodes {
-		if err := a.ClusterSnapshot.AddNode(clustersnapshot.NodeResourceInfo{Node: node}); err != nil {
+		if err := a.ClusterSnapshot.AddNode(clustersnapshot.NewNodeResourceInfo(node, a.ClusterSnapshot.DraObjectsSource)); err != nil {
 			klog.Errorf("Failed to add node %s to cluster snapshot: %v", node.Name, err)
 			return caerrors.ToAutoscalerError(caerrors.InternalError, err)
 		}
@@ -269,7 +272,7 @@ func (a *StaticAutoscaler) initializeClusterSnapshot(nodes []*apiv1.Node, schedu
 	}
 	for _, pod := range scheduledPods {
 		if knownNodes[pod.Spec.NodeName] {
-			if err := a.ClusterSnapshot.AddPod(clustersnapshot.PodResourceInfo{Pod: pod}, pod.Spec.NodeName); err != nil {
+			if err := a.ClusterSnapshot.AddPod(clustersnapshot.NewPodResourceInfo(pod, a.ClusterSnapshot.DraObjectsSource), pod.Spec.NodeName); err != nil {
 				klog.Errorf("Failed to add pod %s scheduled to node %s to cluster snapshot: %v", pod.Name, pod.Spec.NodeName, err)
 				return caerrors.ToAutoscalerError(caerrors.InternalError, err)
 			}
@@ -330,6 +333,18 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 	isSchedulerProcessingIgnored := len(a.BypassedSchedulers) > 0
 	if isSchedulerProcessingIgnored {
 		schedulerUnprocessed = kube_util.SchedulerUnprocessedPods(pods, a.BypassedSchedulers)
+	}
+
+	if a.draProvider != nil {
+		// Get DRA-related objects associated with pods and nodes.
+		draObjects, err := a.draProvider.Snapshot()
+		if err != nil {
+			klog.Errorf("Failed to list DRA objects: %v", err)
+			return caerrors.ToAutoscalerError(caerrors.ApiCallError, err)
+		}
+		// The DRA objects are needed in most places where nodes or pods are added to ClusterSnapshot. The snapshot handle
+		// groups both together - save them there for this loop.
+		a.AutoscalingContext.ClusterSnapshot.DraObjectsSource = draObjects
 	}
 
 	// Update cluster resource usage metrics

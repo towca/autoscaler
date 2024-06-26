@@ -48,7 +48,7 @@ type AutoscalingContext struct {
 	// PredicateChecker to check if a pod can fit into a node.
 	PredicateChecker predicatechecker.PredicateChecker
 	// ClusterSnapshot denotes cluster snapshot used for predicate checking.
-	ClusterSnapshot clustersnapshot.ClusterSnapshot
+	ClusterSnapshot *clustersnapshot.Handle
 	// ExpanderStrategy is the strategy used to choose which node group to expand when scaling up
 	ExpanderStrategy expander.Strategy
 	// ProcessorCallbacks is interface defining extra callback methods which can be called by processors used in extension points.
@@ -113,7 +113,7 @@ func NewAutoscalingContext(
 		CloudProvider:          cloudProvider,
 		AutoscalingKubeClients: *autoscalingKubeClients,
 		PredicateChecker:       predicateChecker,
-		ClusterSnapshot:        clusterSnapshot,
+		ClusterSnapshot:        &clustersnapshot.Handle{ClusterSnapshot: clusterSnapshot},
 		ExpanderStrategy:       expanderStrategy,
 		ProcessorCallbacks:     processorCallbacks,
 		DebuggingSnapshotter:   debuggingSnapshotter,
