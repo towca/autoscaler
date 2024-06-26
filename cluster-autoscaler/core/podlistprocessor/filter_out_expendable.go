@@ -56,9 +56,8 @@ func (p *filterOutExpendable) Process(context *context.AutoscalingContext, pods 
 // this is not strictly correct as we are not simulating preemption itself but it matches
 // CA logic from before migration to scheduler framework. So let's keep it for now
 func (p *filterOutExpendable) addPreemptingPodsToSnapshot(pods []*apiv1.Pod, ctx *context.AutoscalingContext) error {
-	// TODO(DRA): Plumb the pods' DRA objects here and include them in the ResourceInfo going to the snapshot.
 	for _, p := range pods {
-		if err := ctx.ClusterSnapshot.AddPod(clustersnapshot.PodResourceInfo{Pod: p}, p.Status.NominatedNodeName); err != nil {
+		if err := ctx.ClusterSnapshot.AddPod(clustersnapshot.NewPodResourceInfo(p, ctx.ClusterSnapshot.DraObjectsSource), p.Status.NominatedNodeName); err != nil {
 			klog.Errorf("Failed to update snapshot with pod %s/%s waiting for preemption: %v", p.Namespace, p.Name, err)
 			return caerrors.ToAutoscalerError(caerrors.InternalError, err)
 		}
