@@ -148,7 +148,7 @@ func (data *internalBasicSnapshotData) addNode(node NodeResourceInfo) error {
 	}
 	nodeInfo := schedulerframework.NewNodeInfo()
 	nodeInfo.SetNode(node.Node)
-	// TODO(DRA): nodeInfo.SetDynamicResources(???)
+	nodeInfo.SetDynamicResources(node.DynamicResources)
 	data.nodeInfoMap[node.Node.Name] = nodeInfo
 	return nil
 }
@@ -177,7 +177,7 @@ func (data *internalBasicSnapshotData) addPod(pod PodResourceInfo, nodeName stri
 	if _, found := data.nodeInfoMap[nodeName]; !found {
 		return ErrNodeNotFound
 	}
-	data.nodeInfoMap[nodeName].AddPod(pod.Pod)
+	data.nodeInfoMap[nodeName].AddPodWithDynamicRequests(pod.Pod, pod.DynamicResourceRequests)
 	data.addPvcUsedByPod(pod.Pod)
 	return nil
 }
