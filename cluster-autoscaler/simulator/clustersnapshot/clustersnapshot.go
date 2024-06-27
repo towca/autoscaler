@@ -28,13 +28,13 @@ import (
 // NodeResourceInfo contains all information about a Node and its associated resources needed by the scheduler.
 type NodeResourceInfo struct {
 	Node             *apiv1.Node
-	DynamicResources dynamicresources.NodeDynamicResources
+	DynamicResources schedulerframework.NodeDynamicResources
 }
 
 // PodResourceInfo contains all information about a Pod and its associated resource requests needed by the scheduler.
 type PodResourceInfo struct {
 	Pod                     *apiv1.Pod
-	DynamicResourceRequests dynamicresources.PodDynamicResourceRequests
+	DynamicResourceRequests schedulerframework.PodDynamicResourceRequests
 }
 
 // NewNodeResourceInfo combines a node with its associated DRA objects.
