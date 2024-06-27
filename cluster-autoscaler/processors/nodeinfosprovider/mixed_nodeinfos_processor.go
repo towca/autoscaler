@@ -17,6 +17,8 @@ limitations under the License.
 package nodeinfosprovider
 
 import (
+	"fmt"
+	"math/rand"
 	"reflect"
 	"time"
 
@@ -109,7 +111,7 @@ func (p *MixedTemplateNodeInfoProvider) Process(ctx *context.AutoscalingContext,
 				pods = append(pods, podInfo.Pod)
 			}
 
-			sanitizedNodeInfo := schedulerframework.NewNodeInfo(utils.SanitizePods(pods, sanitizedNode)...)
+			sanitizedNodeInfo := schedulerframework.NewNodeInfo(utils.SanitizePods(pods, sanitizedNode.Name, fmt.Sprintf("%d", rand.Int63()))...)
 			sanitizedNodeInfo.SetNode(sanitizedNode)
 			// TODO(DRA): sanitizedNodeInfo.SetDynamicResources(???)
 			result[id] = sanitizedNodeInfo
