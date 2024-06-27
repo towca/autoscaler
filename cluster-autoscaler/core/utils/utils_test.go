@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -29,16 +30,23 @@ import (
 )
 
 func TestSanitizePods(t *testing.T) {
-	pod := BuildTestPod("p1", 80, 0)
-	pod.Spec.NodeName = "n1"
-	pods := []*apiv1.Pod{pod}
+	pod1 := BuildTestPod("p1", 80, 0)
+	pod1.UID = "uid1"
+	pod1.Spec.NodeName = "n1"
+	pod2 := BuildTestPod("p2", 80, 0)
+	pod2.UID = "uid2"
+	pod2.Spec.NodeName = "n2"
+	pods := []*apiv1.Pod{pod1, pod2}
 
-	node := BuildTestNode("node", 1000, 1000)
+	resultPods := SanitizePods(pods, "n100", "abc")
+	resultPods = append(resultPods, SanitizePod(pod1, "n100", "abc"))
 
-	resNode, err := SanitizeNode(node, "test-group", taints.TaintConfig{})
-	assert.NoError(t, err)
-	res := SanitizePods(pods, resNode)
-	assert.Equal(t, 1, len(res))
+	for _, pod := range resultPods {
+		assert.Equal(t, pod.Spec.NodeName, "n100")
+		assert.True(t, strings.HasSuffix(pod.Name, "-abc"))
+		assert.NotEqual(t, "uid1", pod.UID)
+		assert.NotEqual(t, "uid2", pod.UID)
+	}
 }
 
 func TestSanitizeLabels(t *testing.T) {

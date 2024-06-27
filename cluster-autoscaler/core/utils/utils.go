@@ -24,6 +24,7 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/daemonset"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
@@ -58,7 +59,7 @@ func GetNodeInfoFromTemplate(nodeGroup cloudprovider.NodeGroup, daemonsets []*ap
 		pods = append(pods, podInfo.Pod)
 	}
 
-	sanitizedNodeInfo := schedulerframework.NewNodeInfo(SanitizePods(pods, sanitizedNode)...)
+	sanitizedNodeInfo := schedulerframework.NewNodeInfo(SanitizePods(pods, sanitizedNode.Name, fmt.Sprintf("%d", rand.Int63()))...)
 	sanitizedNodeInfo.SetNode(sanitizedNode)
 	// TODO(DRA): sanitizedNodeInfo.SetDynamicResources(???)
 	return sanitizedNodeInfo, nil
@@ -121,17 +122,23 @@ func SanitizeNode(node *apiv1.Node, nodeGroup string, taintConfig taints.TaintCo
 	return newNode, nil
 }
 
-// SanitizePods cleans up pods used for node group templates
-func SanitizePods(pods []*apiv1.Pod, sanitizedNode *apiv1.Node) []*apiv1.Pod {
-	// Update node name in pods.
-	sanitizedPods := make([]*apiv1.Pod, 0)
+// SanitizePods sanitizes a collection of Pods - see comment on SanitizePod.
+func SanitizePods(pods []*apiv1.Pod, nodeName string, nameSuffix string) []*apiv1.Pod {
+	var result []*apiv1.Pod
 	for _, pod := range pods {
-		sanitizedPod := pod.DeepCopy()
-		sanitizedPod.Spec.NodeName = sanitizedNode.Name
-		sanitizedPods = append(sanitizedPods, sanitizedPod)
+		result = append(result, SanitizePod(pod, nodeName, nameSuffix))
 	}
+	return result
+}
 
-	return sanitizedPods
+// SanitizePod returns a copy of the provided Pod meant to be injected into the cluster snapshot along the original pod (so
+// the name and UID have to be changed), scheduled on a new Node.
+func SanitizePod(pod *apiv1.Pod, nodeName string, nameSuffix string) *apiv1.Pod {
+	podCopy := pod.DeepCopy()
+	podCopy.Name = fmt.Sprintf("%s-%s", pod.Name, nameSuffix)
+	podCopy.UID = uuid.NewUUID()
+	podCopy.Spec.NodeName = nodeName
+	return podCopy
 }
 
 func hasHardInterPodAffinity(affinity *apiv1.Affinity) bool {
