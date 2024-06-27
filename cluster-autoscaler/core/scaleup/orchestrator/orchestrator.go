@@ -570,13 +570,8 @@ func (o *ScaleUpOrchestrator) SchedulablePodGroups(
 	o.autoscalingContext.ClusterSnapshot.Fork()
 	defer o.autoscalingContext.ClusterSnapshot.Revert()
 
-	// TODO(DRA): Copy DRA objects from the template Node and its Pods into the ResourceInfos before adding to snapshot.
 	// Add test node to snapshot.
-	var allPods []clustersnapshot.PodResourceInfo
-	for _, podInfo := range nodeInfo.Pods {
-		allPods = append(allPods, clustersnapshot.PodResourceInfo{Pod: podInfo.Pod})
-	}
-	if err := o.autoscalingContext.ClusterSnapshot.AddNodeWithPods(clustersnapshot.NodeResourceInfo{Node: nodeInfo.Node()}, allPods); err != nil {
+	if err := o.autoscalingContext.ClusterSnapshot.AddNodeWithPods(clustersnapshot.ResourceInfos(nodeInfo)); err != nil {
 		klog.Errorf("Error while adding test Node: %v", err)
 		return []estimator.PodEquivalenceGroup{}
 	}
