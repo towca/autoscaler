@@ -147,7 +147,7 @@ func (data *internalDeltaSnapshotData) addNodes(nodes []NodeResourceInfo) error 
 func (data *internalDeltaSnapshotData) addNode(node NodeResourceInfo) error {
 	nodeInfo := schedulerframework.NewNodeInfo()
 	nodeInfo.SetNode(node.Node)
-	// TODO(DRA): nodeInfo.SetDynamicResources(???)
+	nodeInfo.SetDynamicResources(node.DynamicResources)
 	return data.addNodeInfo(nodeInfo)
 }
 
@@ -242,7 +242,7 @@ func (data *internalDeltaSnapshotData) addPod(pod PodResourceInfo, nodeName stri
 		return ErrNodeNotFound
 	}
 
-	ni.AddPod(pod.Pod)
+	ni.AddPodWithDynamicRequests(pod.Pod, pod.DynamicResourceRequests)
 
 	// Maybe consider deleting from the list in the future. Maybe not.
 	data.clearCaches()
