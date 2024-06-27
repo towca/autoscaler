@@ -50,6 +50,7 @@ func GetNodeInfoFromTemplate(nodeGroup cloudprovider.NodeGroup, daemonsets []*ap
 		return nil, typedErr
 	}
 	baseNodeInfo.SetNode(sanitizedNode)
+	// TODO(DRA): baseNodeInfo.SetDynamicResources(???)
 
 	pods, err := daemonset.GetDaemonSetPodsForNode(baseNodeInfo, daemonsets)
 	if err != nil {
@@ -61,6 +62,7 @@ func GetNodeInfoFromTemplate(nodeGroup cloudprovider.NodeGroup, daemonsets []*ap
 
 	sanitizedNodeInfo := schedulerframework.NewNodeInfo(SanitizePods(pods, sanitizedNode)...)
 	sanitizedNodeInfo.SetNode(sanitizedNode)
+	// TODO(DRA): sanitizedNodeInfo.SetDynamicResources(???)
 	return sanitizedNodeInfo, nil
 }
 
@@ -100,6 +102,7 @@ func DeepCopyNodeInfo(nodeInfo *schedulerframework.NodeInfo) *schedulerframework
 	// Build a new node info.
 	newNodeInfo := schedulerframework.NewNodeInfo(newPods...)
 	newNodeInfo.SetNode(nodeInfo.Node().DeepCopy())
+	// TODO(DRA): newNodeInfo.SetDynamicResources(???)
 	return newNodeInfo
 }
 
