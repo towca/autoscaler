@@ -148,7 +148,7 @@ func (data *internalBasicSnapshotData) addNode(node NodeResourceInfo) error {
 	}
 	nodeInfo := schedulerframework.NewNodeInfo()
 	nodeInfo.SetNode(node.Node)
-	// TODO(DRA): nodeInfo.SetDynamicResources(???)
+	nodeInfo.SetDynamicResources(node.DynamicResources)
 	data.nodeInfoMap[node.Node.Name] = nodeInfo
 	return nil
 }
