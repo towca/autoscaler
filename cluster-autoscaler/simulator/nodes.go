@@ -32,6 +32,7 @@ import (
 func BuildNodeInfoForNode(node *apiv1.Node, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) (*schedulerframework.NodeInfo, errors.AutoscalerError) {
 	nodeInfo := schedulerframework.NewNodeInfo()
 	nodeInfo.SetNode(node)
+	// TODO(DRA): nodeInfo.SetDynamicResources(???)
 	return addExpectedPods(nodeInfo, scheduledPods, daemonsets, forceDaemonSets)
 }
 

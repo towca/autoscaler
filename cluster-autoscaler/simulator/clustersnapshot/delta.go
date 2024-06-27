@@ -147,6 +147,7 @@ func (data *internalDeltaSnapshotData) addNodes(nodes []NodeResourceInfo) error 
 func (data *internalDeltaSnapshotData) addNode(node NodeResourceInfo) error {
 	nodeInfo := schedulerframework.NewNodeInfo()
 	nodeInfo.SetNode(node.Node)
+	// TODO(DRA): nodeInfo.SetDynamicResources(???)
 	return data.addNodeInfo(nodeInfo)
 }
 

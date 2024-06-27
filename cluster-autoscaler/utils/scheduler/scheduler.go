@@ -58,6 +58,7 @@ func CreateNodeNameToInfoMap(pods []*apiv1.Pod, nodes []*apiv1.Node) map[string]
 			nodeNameToNodeInfo[node.Name] = schedulerframework.NewNodeInfo()
 		}
 		nodeNameToNodeInfo[node.Name].SetNode(node)
+		// TODO(DRA): nodeNameToNodeInfo[node.Name].SetDynamicResources(???)
 	}
 
 	// Some pods may be out of sync with node lists. Removing incomplete node infos.
@@ -91,6 +92,7 @@ func DeepCopyTemplateNode(nodeTemplate *schedulerframework.NodeInfo, suffix stri
 	node.Labels["kubernetes.io/hostname"] = node.Name
 	nodeInfo := schedulerframework.NewNodeInfo()
 	nodeInfo.SetNode(node)
+	// TODO(DRA): nodeInfo.SetDynamicResources(???)
 	for _, podInfo := range nodeTemplate.Pods {
 		pod := podInfo.Pod.DeepCopy()
 		pod.Name = fmt.Sprintf("%s-%s", podInfo.Pod.Name, suffix)

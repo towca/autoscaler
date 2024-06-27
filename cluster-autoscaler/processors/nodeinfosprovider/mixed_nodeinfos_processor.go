@@ -111,6 +111,7 @@ func (p *MixedTemplateNodeInfoProvider) Process(ctx *context.AutoscalingContext,
 
 			sanitizedNodeInfo := schedulerframework.NewNodeInfo(utils.SanitizePods(pods, sanitizedNode)...)
 			sanitizedNodeInfo.SetNode(sanitizedNode)
+			// TODO(DRA): sanitizedNodeInfo.SetDynamicResources(???)
 			result[id] = sanitizedNodeInfo
 			return true, id, nil
 		}
