@@ -502,12 +502,7 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 	// The fake nodes are intentionally not added to the all nodes list, so that they are not considered as candidates for scale-down (which
 	// doesn't make sense as they're not real).
 	for _, upcomingNode := range getUpcomingNodeInfos(upcomingCounts, nodeInfosForGroups) {
-		// TODO(DRA): Copy DRA objects from the template Node and its Pods into the ResourceInfos before adding to snapshot.
-		var pods []clustersnapshot.PodResourceInfo
-		for _, podInfo := range upcomingNode.Pods {
-			pods = append(pods, clustersnapshot.PodResourceInfo{Pod: podInfo.Pod})
-		}
-		err = a.ClusterSnapshot.AddNodeWithPods(clustersnapshot.NodeResourceInfo{Node: upcomingNode.Node()}, pods)
+		err = a.ClusterSnapshot.AddNodeWithPods(clustersnapshot.ResourceInfos(upcomingNode))
 		if err != nil {
 			klog.Errorf("Failed to add upcoming node %s to cluster snapshot: %v", upcomingNode.Node().Name, err)
 			return caerrors.ToAutoscalerError(caerrors.InternalError, err)

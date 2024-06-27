@@ -47,6 +47,15 @@ func NewPodResourceInfo(pod *apiv1.Pod, draObjects dynamicresources.Snapshot) Po
 	return PodResourceInfo{Pod: pod, DynamicResourceRequests: draObjects.PodResourceRequests(pod)}
 }
 
+// ResourceInfos translates a NodeInfo into a NodeResourceInfo and a list of PodResourceInfos.
+func ResourceInfos(nodeInfo *schedulerframework.NodeInfo) (NodeResourceInfo, []PodResourceInfo) {
+	var podInfos []PodResourceInfo
+	for _, p := range nodeInfo.Pods {
+		podInfos = append(podInfos, PodResourceInfo{Pod: p.Pod, DynamicResourceRequests: p.DynamicResourceRequests})
+	}
+	return NodeResourceInfo{Node: nodeInfo.Node(), DynamicResources: nodeInfo.DynamicResources()}, podInfos
+}
+
 // ClusterSnapshot is abstraction of cluster state used for predicate simulations.
 // It exposes mutation methods and can be viewed as scheduler's SharedLister.
 type ClusterSnapshot interface {
