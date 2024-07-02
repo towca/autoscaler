@@ -1020,7 +1020,7 @@ func (a *StaticAutoscaler) updateClusterState(allNodes []*apiv1.Node, nodeInfosF
 		a.scaleDownPlanner.CleanUpUnneededNodes()
 		return caerrors.ToAutoscalerError(caerrors.CloudProviderError, err)
 	}
-	core_utils.UpdateClusterStateMetrics(a.clusterStateRegistry)
+	clusterstate.UpdateClusterStateMetrics(a.clusterStateRegistry)
 
 	return nil
 }
