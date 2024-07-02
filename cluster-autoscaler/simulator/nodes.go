@@ -28,15 +28,20 @@ import (
 	pod_util "k8s.io/autoscaler/cluster-autoscaler/utils/pod"
 )
 
-// BuildNodeInfoForNode build a NodeInfo structure for the given node as if the node was just created.
-func BuildNodeInfoForNode(node *apiv1.Node, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) (*schedulerframework.NodeInfo, errors.AutoscalerError) {
+// NodeStartupPods returns a list of pods which are always expected to be scheduled on a given Node. The list is based on
+// the provided pods currently scheduled on the pods. If forceDaemonSets is true, fake "missing" DS pods are added to the
+// list for DaemonSets that don't have a pod running on the Node but should have.
+//
+// scheduledPods are not modified, the returned pods are not sanitized.
+func NodeStartupPods(node *apiv1.Node, ndr schedulerframework.NodeDynamicResources, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) ([]*apiv1.Pod, errors.AutoscalerError) {
 	nodeInfo := schedulerframework.NewNodeInfo()
 	nodeInfo.SetNode(node)
-	// TODO(DRA): nodeInfo.SetDynamicResources(???)
-	return addExpectedPods(nodeInfo, scheduledPods, daemonsets, forceDaemonSets)
+	nodeInfo.SetDynamicResources(ndr)
+	return getStartupPods(nodeInfo, scheduledPods, daemonsets, forceDaemonSets)
 }
 
-func addExpectedPods(nodeInfo *schedulerframework.NodeInfo, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) (*schedulerframework.NodeInfo, errors.AutoscalerError) {
+func getStartupPods(nodeInfo *schedulerframework.NodeInfo, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) ([]*apiv1.Pod, errors.AutoscalerError) {
+	var result []*apiv1.Pod
 	runningDS := make(map[types.UID]bool)
 	for _, pod := range scheduledPods {
 		// Ignore scheduled pods in deletion phase
@@ -46,6 +51,7 @@ func addExpectedPods(nodeInfo *schedulerframework.NodeInfo, scheduledPods []*api
 		// Add scheduled mirror and DS pods
 		if pod_util.IsMirrorPod(pod) || pod_util.IsDaemonSetPod(pod) {
 			nodeInfo.AddPod(pod)
+			result = append(result, pod)
 		}
 		// Mark DS pods as running
 		controllerRef := metav1.GetControllerOf(pod)
@@ -66,8 +72,8 @@ func addExpectedPods(nodeInfo *schedulerframework.NodeInfo, scheduledPods []*api
 			return nil, errors.ToAutoscalerError(errors.InternalError, err)
 		}
 		for _, pod := range daemonPods {
-			nodeInfo.AddPod(pod)
+			result = append(result, pod)
 		}
 	}
-	return nodeInfo, nil
+	return result, nil
 }

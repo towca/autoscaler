@@ -27,6 +27,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 	"k8s.io/autoscaler/cluster-autoscaler/core/utils"
+	"k8s.io/autoscaler/cluster-autoscaler/dynamicresources"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	kube_util "k8s.io/autoscaler/cluster-autoscaler/utils/kubernetes"
@@ -96,24 +97,30 @@ func (p *MixedTemplateNodeInfoProvider) Process(ctx *context.AutoscalingContext,
 		}
 		id := nodeGroup.Id()
 		if _, found := result[id]; !found {
-			// Build nodeInfo.
+			// Get DRA objects associated to the real Node
+			dynamicResources := ctx.ClusterSnapshot.DraObjectsSource.NodeResources(node)
+
+			// Based on the pods scheduled on the real Node, and DaemonSets in the cluster, determine which pods
+			// will schedule on a new Node created by "copying" the real one.
+			startupPods, err := simulator.NodeStartupPods(node, dynamicResources, podsForNodes[node.Name], daemonsets, p.forceDaemonSets)
+			if err != nil {
+				return false, "", err
+			}
+
+			// Deep copy and sanitize a real Node into a fake
 			sanitizedNode, err := utils.SanitizeNode(node, id, taintConfig)
 			if err != nil {
 				return false, "", err
 			}
-			nodeInfo, err := simulator.BuildNodeInfoForNode(sanitizedNode, podsForNodes[node.Name], daemonsets, p.forceDaemonSets)
-			if err != nil {
-				return false, "", err
-			}
+			// Deep copy and sanitize the DRA objects into fakes pointing to the fake sanitized Node.
+			sanitizedDynamicResources := dynamicresources.SanitizedNodeDynamicResources(dynamicResources, sanitizedNode.Name, fmt.Sprintf("%d", rand.Int63()))
+			// Deep copy and sanitize the startup Pods into fakes pointing to the fake sanitized Node.
+			sanitizedStartupPods := utils.SanitizePods(startupPods, sanitizedNode.Name, fmt.Sprintf("%d", rand.Int63()))
 
-			var pods []*apiv1.Pod
-			for _, podInfo := range nodeInfo.Pods {
-				pods = append(pods, podInfo.Pod)
-			}
-
-			sanitizedNodeInfo := schedulerframework.NewNodeInfo(utils.SanitizePods(pods, sanitizedNode.Name, fmt.Sprintf("%d", rand.Int63()))...)
+			// Build the final node info with all 3 parts (Node, Pods, DRA objects) sanitized and in sync.
+			sanitizedNodeInfo := schedulerframework.NewNodeInfo(sanitizedStartupPods...)
 			sanitizedNodeInfo.SetNode(sanitizedNode)
-			// TODO(DRA): sanitizedNodeInfo.SetDynamicResources(???)
+			sanitizedNodeInfo.SetDynamicResources(sanitizedDynamicResources)
 			result[id] = sanitizedNodeInfo
 			return true, id, nil
 		}

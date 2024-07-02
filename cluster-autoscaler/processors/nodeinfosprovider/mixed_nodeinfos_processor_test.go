@@ -22,6 +22,7 @@ import (
 
 	testprovider "k8s.io/autoscaler/cluster-autoscaler/cloudprovider/test"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/predicatechecker"
 	kube_util "k8s.io/autoscaler/cluster-autoscaler/utils/kubernetes"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/taints"
@@ -85,6 +86,7 @@ func TestGetNodeInfosForGroups(t *testing.T) {
 		AutoscalingKubeClients: context.AutoscalingKubeClients{
 			ListerRegistry: registry,
 		},
+		ClusterSnapshot: &clustersnapshot.Handle{ClusterSnapshot: clustersnapshot.NewBasicClusterSnapshot()},
 	}
 	res, err := NewMixedTemplateNodeInfoProvider(&cacheTtl, false).Process(&ctx, []*apiv1.Node{justReady5, unready4, unready3, ready2, ready1}, []*appsv1.DaemonSet{}, taints.TaintConfig{}, now)
 	assert.NoError(t, err)
@@ -112,6 +114,7 @@ func TestGetNodeInfosForGroups(t *testing.T) {
 		AutoscalingKubeClients: context.AutoscalingKubeClients{
 			ListerRegistry: registry,
 		},
+		ClusterSnapshot: &clustersnapshot.Handle{ClusterSnapshot: clustersnapshot.NewBasicClusterSnapshot()},
 	}
 	res, err = NewMixedTemplateNodeInfoProvider(&cacheTtl, false).Process(&ctx, []*apiv1.Node{}, []*appsv1.DaemonSet{}, taints.TaintConfig{}, now)
 	assert.NoError(t, err)
@@ -171,6 +174,7 @@ func TestGetNodeInfosForGroupsCache(t *testing.T) {
 		AutoscalingKubeClients: context.AutoscalingKubeClients{
 			ListerRegistry: registry,
 		},
+		ClusterSnapshot: &clustersnapshot.Handle{ClusterSnapshot: clustersnapshot.NewBasicClusterSnapshot()},
 	}
 	niProcessor := NewMixedTemplateNodeInfoProvider(&cacheTtl, false)
 	res, err := niProcessor.Process(&ctx, []*apiv1.Node{unready4, unready3, ready2, ready1}, []*appsv1.DaemonSet{}, taints.TaintConfig{}, now)
@@ -259,6 +263,7 @@ func TestGetNodeInfosCacheExpired(t *testing.T) {
 		AutoscalingKubeClients: context.AutoscalingKubeClients{
 			ListerRegistry: registry,
 		},
+		ClusterSnapshot: &clustersnapshot.Handle{ClusterSnapshot: clustersnapshot.NewBasicClusterSnapshot()},
 	}
 	tn := BuildTestNode("tn", 5000, 5000)
 	tni := schedulerframework.NewNodeInfo()

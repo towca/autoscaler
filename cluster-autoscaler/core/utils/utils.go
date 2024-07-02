@@ -110,7 +110,7 @@ func DeepCopyNodeInfo(nodeInfo *schedulerframework.NodeInfo) *schedulerframework
 	// Build a new node info.
 	newNodeInfo := schedulerframework.NewNodeInfo(newPods...)
 	newNodeInfo.SetNode(nodeInfo.Node().DeepCopy())
-	// TODO(DRA): newNodeInfo.SetDynamicResources(???)
+	newNodeInfo.SetDynamicResources(nodeInfo.DynamicResources().DeepCopy())
 	return newNodeInfo
 }
 

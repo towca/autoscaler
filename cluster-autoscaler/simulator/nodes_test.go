@@ -28,9 +28,10 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/test"
 	"k8s.io/kubernetes/pkg/controller/daemon"
+	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
-func TestBuildNodeInfoForNode(t *testing.T) {
+func TestNodeStartupPods(t *testing.T) {
 	ds1 := &appsv1.DaemonSet{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "ds1",
@@ -194,21 +195,20 @@ func TestBuildNodeInfoForNode(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			nodeInfo, err := BuildNodeInfoForNode(tc.node, tc.pods, tc.daemonSets, tc.forceDS)
+			startupPods, err := NodeStartupPods(tc.node, schedulerframework.NodeDynamicResources{}, tc.pods, tc.daemonSets, tc.forceDS)
 
 			if tc.wantError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
-				assert.Equal(t, nodeInfo.Node(), tc.node)
 
 				// clean pod metadata for comparison purposes
 				var wantPods, pods []*apiv1.Pod
 				for _, pod := range tc.wantPods {
 					wantPods = append(wantPods, cleanPodMetadata(pod))
 				}
-				for _, podInfo := range nodeInfo.Pods {
-					pods = append(pods, cleanPodMetadata(podInfo.Pod))
+				for _, pod := range startupPods {
+					pods = append(pods, cleanPodMetadata(pod))
 				}
 				assert.ElementsMatch(t, tc.wantPods, pods)
 			}
