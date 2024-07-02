@@ -1,9 +1,11 @@
 package dynamicresources
 
 import (
+	resourceapi "k8s.io/api/resource/v1alpha2"
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	resourceapilisters "k8s.io/client-go/listers/resource/v1alpha2"
+	"k8s.io/klog/v2"
 )
 
 // Provider provides DRA-related objects. Zero-value Provider object provides no objects, it can be used e.g. in tests.
@@ -31,17 +33,36 @@ func (p *Provider) Snapshot() (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
+	claimMap := make(map[objectRef]*resourceapi.ResourceClaim)
+	for _, claim := range claims {
+		claimMap[objectRef{name: claim.Name, namespace: claim.Namespace}] = claim
+	}
+
 	params, err := p.resourceClaimParameters.List(labels.Everything())
 	if err != nil {
 		return Snapshot{}, err
 	}
+	paramsMap := make(map[objectRef]*resourceapi.ResourceClaimParameters)
+	for _, param := range params {
+		paramsMap[objectRef{name: param.Name, namespace: param.Namespace}] = param
+	}
+
 	slices, err := p.resourceSlices.List(labels.Everything())
 	if err != nil {
 		return Snapshot{}, err
 	}
+	slicesMap := make(map[string][]*resourceapi.ResourceSlice)
+	for _, slice := range slices {
+		if slice.NodeName == "" {
+			klog.Warningf("DRA: ignoring non-Node-local ResourceSlice %s/%s", slice.Namespace, slice.Name)
+			continue
+		}
+		slicesMap[slice.NodeName] = append(slicesMap[slice.NodeName], slice)
+	}
+
 	return Snapshot{
-		resourceClaims:          claims,
-		resourceClaimParameters: params,
-		resourceSlices:          slices,
+		resourceClaimsByRef:          claimMap,
+		resourceClaimParametersByRef: paramsMap,
+		resourceSlicesByNodeName:     slicesMap,
 	}, nil
 }
