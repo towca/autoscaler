@@ -66,17 +66,11 @@ func GetNodeInfoFromTemplate(nodeGroup cloudprovider.NodeGroup, daemonsets []*ap
 	for _, podInfo := range baseNodeInfo.Pods {
 		startupPods = append(startupPods, clustersnapshot.PodResourceInfo{Pod: podInfo.Pod, DynamicResourceRequests: podInfo.DynamicResourceRequests})
 	}
-	// Deep copy and sanitize the startup Pods into fakes pointing to the fake sanitized Node
+	// Deep copy and sanitize the startup Pods and the associated DRA objects into fakes pointing to the fake sanitized Node
 	sanitizedStartupPods := SanitizePods(startupPods, sanitizedNode.Node.Name, fmt.Sprintf("%d", rand.Int63()))
 
 	// Build the final node info with all 3 parts (Node, Pods, DRA objects) sanitized and in sync.
-	sanitizedNodeInfo := schedulerframework.NewNodeInfo()
-	sanitizedNodeInfo.SetNode(sanitizedNode.Node)
-	sanitizedNodeInfo.SetDynamicResources(sanitizedNode.DynamicResources)
-	for _, pod := range sanitizedStartupPods {
-		sanitizedNodeInfo.AddPodWithDynamicRequests(pod.Pod, pod.DynamicResourceRequests)
-	}
-	return sanitizedNodeInfo, nil
+	return clustersnapshot.NewNodeInfo(sanitizedNode, sanitizedStartupPods), nil
 }
 
 // isVirtualNode determines if the node is created by virtual kubelet

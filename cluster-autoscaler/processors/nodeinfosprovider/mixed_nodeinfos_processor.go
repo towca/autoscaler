@@ -104,23 +104,17 @@ func (p *MixedTemplateNodeInfoProvider) Process(ctx *context.AutoscalingContext,
 				return false, "", err
 			}
 
-			// Deep copy and sanitize a real Node into a fake
+			// Deep copy and sanitize a real Node (and its associated DRA objects) into a fake
 			sanitizedNode, err := utils.SanitizeNode(clustersnapshot.NewNodeResourceInfo(node, ctx.ClusterSnapshot.DraObjectsSource), id, taintConfig)
 			if err != nil {
 				return false, "", err
 			}
 
-			// Deep copy and sanitize the startup Pods into fakes pointing to the fake sanitized Node.
+			// Deep copy and sanitize the startup Pods (and their associated DRA objects) into fakes pointing to the fake sanitized Node.
 			sanitizedStartupPods := utils.SanitizePods(startupPods, sanitizedNode.Node.Name, fmt.Sprintf("%d", rand.Int63()))
 
 			// Build the final node info with all 3 parts (Node, Pods, DRA objects) sanitized and in sync.
-			sanitizedNodeInfo := schedulerframework.NewNodeInfo()
-			sanitizedNodeInfo.SetNode(sanitizedNode.Node)
-			sanitizedNodeInfo.SetDynamicResources(sanitizedNode.DynamicResources)
-			for _, pod := range sanitizedStartupPods {
-				sanitizedNodeInfo.AddPodWithDynamicRequests(pod.Pod, pod.DynamicResourceRequests)
-			}
-			result[id] = sanitizedNodeInfo
+			result[id] = clustersnapshot.NewNodeInfo(sanitizedNode, sanitizedStartupPods)
 			return true, id, nil
 		}
 		return false, "", nil

@@ -56,6 +56,17 @@ func ResourceInfos(nodeInfo *schedulerframework.NodeInfo) (NodeResourceInfo, []P
 	return NodeResourceInfo{Node: nodeInfo.Node(), DynamicResources: nodeInfo.DynamicResources()}, podInfos
 }
 
+// NewNodeInfo creates a new NodeInfo based on a Node and its Pods, as well as any associated DRA objects.
+func NewNodeInfo(node NodeResourceInfo, pods []PodResourceInfo) *schedulerframework.NodeInfo {
+	result := schedulerframework.NewNodeInfo()
+	result.SetNode(node.Node)
+	result.SetDynamicResources(node.DynamicResources)
+	for _, pod := range pods {
+		result.AddPodWithDynamicRequests(pod.Pod, pod.DynamicResourceRequests)
+	}
+	return result
+}
+
 // ClusterSnapshot is abstraction of cluster state used for predicate simulations.
 // It exposes mutation methods and can be viewed as scheduler's SharedLister.
 type ClusterSnapshot interface {
