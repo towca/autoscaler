@@ -27,6 +27,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/dynamicresources"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/daemonset"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/gpu"
@@ -45,32 +46,36 @@ func GetNodeInfoFromTemplate(nodeGroup cloudprovider.NodeGroup, daemonsets []*ap
 
 	labels.UpdateDeprecatedLabels(baseNodeInfo.Node().ObjectMeta.Labels)
 
-	// Deep copy and sanitize the template node returned from the cloud provider
-	sanitizedNode, typedErr := SanitizeNode(baseNodeInfo.Node(), id, taintConfig)
+	// Deep copy and sanitize the template node and the associated DRA objects returned from the cloud provider
+	sanitizedNode, typedErr := SanitizeNode(clustersnapshot.NodeResourceInfo{Node: baseNodeInfo.Node(), DynamicResources: baseNodeInfo.DynamicResources()}, id, taintConfig)
 	if err != nil {
 		return nil, typedErr
 	}
-	// Deep copy and sanitize the DRA objects returned from the cloud provider into fakes pointing to the fake sanitized Node
-	sanitizedDynamicResources := dynamicresources.SanitizedNodeDynamicResources(baseNodeInfo.DynamicResources(), sanitizedNode.Name, fmt.Sprintf("%d", rand.Int63()))
 
+	var startupPods []clustersnapshot.PodResourceInfo
 	// Determine DS pods that will be scheduled on the Node created from this template
-	baseNodeInfo.SetNode(sanitizedNode)
-	baseNodeInfo.SetDynamicResources(sanitizedDynamicResources)
-	startupPods, err := daemonset.GetDaemonSetPodsForNode(baseNodeInfo.Node(), daemonsets)
+	dsPods, err := daemonset.GetDaemonSetPodsForNode(sanitizedNode.Node, daemonsets)
 	if err != nil {
 		return nil, errors.ToAutoscalerError(errors.InternalError, err)
 	}
+	for _, pod := range dsPods {
+		// TODO(DRA): Simulate DRA requests for simulated DS pods.
+		startupPods = append(startupPods, clustersnapshot.PodResourceInfo{Pod: pod, DynamicResourceRequests: schedulerframework.PodDynamicResourceRequests{}})
+	}
 	// Add the startup pods included in the node info returned from the cloud provider
 	for _, podInfo := range baseNodeInfo.Pods {
-		startupPods = append(startupPods, podInfo.Pod)
+		startupPods = append(startupPods, clustersnapshot.PodResourceInfo{Pod: podInfo.Pod, DynamicResourceRequests: podInfo.DynamicResourceRequests})
 	}
 	// Deep copy and sanitize the startup Pods into fakes pointing to the fake sanitized Node
-	sanitizedStartupPods := SanitizePods(startupPods, sanitizedNode.Name, fmt.Sprintf("%d", rand.Int63()))
+	sanitizedStartupPods := SanitizePods(startupPods, sanitizedNode.Node.Name, fmt.Sprintf("%d", rand.Int63()))
 
 	// Build the final node info with all 3 parts (Node, Pods, DRA objects) sanitized and in sync.
-	sanitizedNodeInfo := schedulerframework.NewNodeInfo(sanitizedStartupPods...)
-	sanitizedNodeInfo.SetNode(sanitizedNode)
-	sanitizedNodeInfo.SetDynamicResources(sanitizedDynamicResources)
+	sanitizedNodeInfo := schedulerframework.NewNodeInfo()
+	sanitizedNodeInfo.SetNode(sanitizedNode.Node)
+	sanitizedNodeInfo.SetDynamicResources(sanitizedNode.DynamicResources)
+	for _, pod := range sanitizedStartupPods {
+		sanitizedNodeInfo.AddPodWithDynamicRequests(pod.Pod, pod.DynamicResourceRequests)
+	}
 	return sanitizedNodeInfo, nil
 }
 
@@ -115,11 +120,12 @@ func DeepCopyNodeInfo(nodeInfo *schedulerframework.NodeInfo) *schedulerframework
 }
 
 // SanitizeNode cleans up nodes used for node group templates
-func SanitizeNode(node *apiv1.Node, nodeGroup string, taintConfig taints.TaintConfig) (*apiv1.Node, errors.AutoscalerError) {
-	newNode := node.DeepCopy()
-	nodeName := fmt.Sprintf("template-node-for-%s-%d", nodeGroup, rand.Int63())
-	newNode.Labels = make(map[string]string, len(node.Labels))
-	for k, v := range node.Labels {
+func SanitizeNode(nodeResInfo clustersnapshot.NodeResourceInfo, nodeGroup string, taintConfig taints.TaintConfig) (clustersnapshot.NodeResourceInfo, errors.AutoscalerError) {
+	newNode := nodeResInfo.Node.DeepCopy()
+	randSuffix := fmt.Sprintf("%d", rand.Int63())
+	nodeName := fmt.Sprintf("template-node-for-%s-%s", nodeGroup, randSuffix)
+	newNode.Labels = make(map[string]string, len(nodeResInfo.Node.Labels))
+	for k, v := range nodeResInfo.Node.Labels {
 		if k != apiv1.LabelHostname {
 			newNode.Labels[k] = v
 		} else {
@@ -128,12 +134,13 @@ func SanitizeNode(node *apiv1.Node, nodeGroup string, taintConfig taints.TaintCo
 	}
 	newNode.Name = nodeName
 	newNode.Spec.Taints = taints.SanitizeTaints(newNode.Spec.Taints, taintConfig)
-	return newNode, nil
+	newDynamicResources := dynamicresources.SanitizedNodeDynamicResources(nodeResInfo.DynamicResources, newNode.Name, randSuffix)
+	return clustersnapshot.NodeResourceInfo{Node: newNode, DynamicResources: newDynamicResources}, nil
 }
 
 // SanitizePods sanitizes a collection of Pods - see comment on SanitizePod.
-func SanitizePods(pods []*apiv1.Pod, nodeName string, nameSuffix string) []*apiv1.Pod {
-	var result []*apiv1.Pod
+func SanitizePods(pods []clustersnapshot.PodResourceInfo, nodeName string, nameSuffix string) []clustersnapshot.PodResourceInfo {
+	var result []clustersnapshot.PodResourceInfo
 	for _, pod := range pods {
 		result = append(result, SanitizePod(pod, nodeName, nameSuffix))
 	}
@@ -142,12 +149,13 @@ func SanitizePods(pods []*apiv1.Pod, nodeName string, nameSuffix string) []*apiv
 
 // SanitizePod returns a copy of the provided Pod meant to be injected into the cluster snapshot along the original pod (so
 // the name and UID have to be changed), scheduled on a new Node.
-func SanitizePod(pod *apiv1.Pod, nodeName string, nameSuffix string) *apiv1.Pod {
-	podCopy := pod.DeepCopy()
-	podCopy.Name = fmt.Sprintf("%s-%s", pod.Name, nameSuffix)
+func SanitizePod(podResInfo clustersnapshot.PodResourceInfo, nodeName string, nameSuffix string) clustersnapshot.PodResourceInfo {
+	podCopy := podResInfo.Pod.DeepCopy()
+	podCopy.Name = fmt.Sprintf("%s-%s", podResInfo.Pod.Name, nameSuffix)
 	podCopy.UID = uuid.NewUUID()
 	podCopy.Spec.NodeName = nodeName
-	return podCopy
+	dynamicRequestsCopy := dynamicresources.SanitizedPodDynamicResourceRequests(podResInfo.DynamicResourceRequests, nameSuffix)
+	return clustersnapshot.PodResourceInfo{Pod: podCopy, DynamicResourceRequests: dynamicRequestsCopy}
 }
 
 func hasHardInterPodAffinity(affinity *apiv1.Affinity) bool {

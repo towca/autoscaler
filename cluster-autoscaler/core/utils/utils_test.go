@@ -17,6 +17,7 @@ limitations under the License.
 package utils
 
 import (
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"strings"
 	"testing"
 	"time"
@@ -30,37 +31,37 @@ import (
 )
 
 func TestSanitizePods(t *testing.T) {
-	pod1 := BuildTestPod("p1", 80, 0)
-	pod1.UID = "uid1"
-	pod1.Spec.NodeName = "n1"
-	pod2 := BuildTestPod("p2", 80, 0)
-	pod2.UID = "uid2"
-	pod2.Spec.NodeName = "n2"
-	pods := []*apiv1.Pod{pod1, pod2}
+	pod1 := clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p1", 80, 0)}
+	pod1.Pod.UID = "uid1"
+	pod1.Pod.Spec.NodeName = "n1"
+	pod2 := clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p2", 80, 0)}
+	pod2.Pod.UID = "uid2"
+	pod2.Pod.Spec.NodeName = "n2"
+	pods := []clustersnapshot.PodResourceInfo{pod1, pod2}
 
 	resultPods := SanitizePods(pods, "n100", "abc")
 	resultPods = append(resultPods, SanitizePod(pod1, "n100", "abc"))
 
 	for _, pod := range resultPods {
-		assert.Equal(t, pod.Spec.NodeName, "n100")
-		assert.True(t, strings.HasSuffix(pod.Name, "-abc"))
-		assert.NotEqual(t, "uid1", pod.UID)
-		assert.NotEqual(t, "uid2", pod.UID)
+		assert.Equal(t, pod.Pod.Spec.NodeName, "n100")
+		assert.True(t, strings.HasSuffix(pod.Pod.Name, "-abc"))
+		assert.NotEqual(t, "uid1", pod.Pod.UID)
+		assert.NotEqual(t, "uid2", pod.Pod.UID)
 	}
 }
 
 func TestSanitizeLabels(t *testing.T) {
-	oldNode := BuildTestNode("ng1-1", 1000, 1000)
-	oldNode.Labels = map[string]string{
+	oldNode := clustersnapshot.NodeResourceInfo{Node: BuildTestNode("ng1-1", 1000, 1000)}
+	oldNode.Node.Labels = map[string]string{
 		apiv1.LabelHostname: "abc",
 		"x":                 "y",
 	}
 	node, err := SanitizeNode(oldNode, "bzium", taints.TaintConfig{})
 	assert.NoError(t, err)
-	assert.NotEqual(t, node.Labels[apiv1.LabelHostname], "abc", nil)
-	assert.Equal(t, node.Labels["x"], "y")
-	assert.NotEqual(t, node.Name, oldNode.Name)
-	assert.Equal(t, node.Labels[apiv1.LabelHostname], node.Name)
+	assert.NotEqual(t, node.Node.Labels[apiv1.LabelHostname], "abc", nil)
+	assert.Equal(t, node.Node.Labels["x"], "y")
+	assert.NotEqual(t, node.Node.Name, oldNode.Node.Name)
+	assert.Equal(t, node.Node.Labels[apiv1.LabelHostname], node.Node.Name)
 }
 
 func TestGetNodeResource(t *testing.T) {

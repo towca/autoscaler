@@ -27,8 +27,8 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 	"k8s.io/autoscaler/cluster-autoscaler/core/utils"
-	"k8s.io/autoscaler/cluster-autoscaler/dynamicresources"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	kube_util "k8s.io/autoscaler/cluster-autoscaler/utils/kubernetes"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/taints"
@@ -97,34 +97,29 @@ func (p *MixedTemplateNodeInfoProvider) Process(ctx *context.AutoscalingContext,
 		}
 		id := nodeGroup.Id()
 		if _, found := result[id]; !found {
-			// Get DRA objects associated to the real Node
-			dynamicResources := ctx.ClusterSnapshot.DraObjectsSource.NodeResources(node)
-
 			// Based on the pods scheduled on the real Node, and DaemonSets in the cluster, determine which pods
 			// will schedule on a new Node created by "copying" the real one.
-			sPods, err := simulator.NodeStartupPods(node, ctx.ClusterSnapshot.DraObjectsSource, podsForNodes[node.Name], daemonsets, p.forceDaemonSets)
+			startupPods, err := simulator.NodeStartupPods(node, ctx.ClusterSnapshot.DraObjectsSource, podsForNodes[node.Name], daemonsets, p.forceDaemonSets)
 			if err != nil {
 				return false, "", err
-			}
-			var startupPods []*apiv1.Pod
-			for _, pod := range sPods {
-				startupPods = append(startupPods, pod.Pod)
 			}
 
 			// Deep copy and sanitize a real Node into a fake
-			sanitizedNode, err := utils.SanitizeNode(node, id, taintConfig)
+			sanitizedNode, err := utils.SanitizeNode(clustersnapshot.NewNodeResourceInfo(node, ctx.ClusterSnapshot.DraObjectsSource), id, taintConfig)
 			if err != nil {
 				return false, "", err
 			}
-			// Deep copy and sanitize the DRA objects into fakes pointing to the fake sanitized Node.
-			sanitizedDynamicResources := dynamicresources.SanitizedNodeDynamicResources(dynamicResources, sanitizedNode.Name, fmt.Sprintf("%d", rand.Int63()))
+
 			// Deep copy and sanitize the startup Pods into fakes pointing to the fake sanitized Node.
-			sanitizedStartupPods := utils.SanitizePods(startupPods, sanitizedNode.Name, fmt.Sprintf("%d", rand.Int63()))
+			sanitizedStartupPods := utils.SanitizePods(startupPods, sanitizedNode.Node.Name, fmt.Sprintf("%d", rand.Int63()))
 
 			// Build the final node info with all 3 parts (Node, Pods, DRA objects) sanitized and in sync.
-			sanitizedNodeInfo := schedulerframework.NewNodeInfo(sanitizedStartupPods...)
-			sanitizedNodeInfo.SetNode(sanitizedNode)
-			sanitizedNodeInfo.SetDynamicResources(sanitizedDynamicResources)
+			sanitizedNodeInfo := schedulerframework.NewNodeInfo()
+			sanitizedNodeInfo.SetNode(sanitizedNode.Node)
+			sanitizedNodeInfo.SetDynamicResources(sanitizedNode.DynamicResources)
+			for _, pod := range sanitizedStartupPods {
+				sanitizedNodeInfo.AddPodWithDynamicRequests(pod.Pod, pod.DynamicResourceRequests)
+			}
 			result[id] = sanitizedNodeInfo
 			return true, id, nil
 		}
