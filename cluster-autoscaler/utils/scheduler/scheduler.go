@@ -26,6 +26,7 @@ import (
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/autoscaler/cluster-autoscaler/core/utils"
 	"k8s.io/autoscaler/cluster-autoscaler/dynamicresources"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	scheduler_config "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	scheduler_scheme "k8s.io/kubernetes/pkg/scheduler/apis/config/scheme"
 	scheduler_validation "k8s.io/kubernetes/pkg/scheduler/apis/config/validation"
@@ -58,7 +59,8 @@ func DeepCopyTemplateNode(nodeTemplate *schedulerframework.NodeInfo, suffix stri
 	nodeInfo.SetNode(node)
 	nodeInfo.SetDynamicResources(dynamicresources.SanitizedNodeDynamicResources(nodeTemplate.DynamicResources(), node.Name, suffix))
 	for _, podInfo := range nodeTemplate.Pods {
-		nodeInfo.AddPod(utils.SanitizePod(podInfo.Pod, node.Name, suffix))
+		sanitizedPod := utils.SanitizePod(clustersnapshot.PodResourceInfo{Pod: podInfo.Pod, DynamicResourceRequests: podInfo.DynamicResourceRequests}, node.Name, suffix)
+		nodeInfo.AddPodWithDynamicRequests(sanitizedPod.Pod, sanitizedPod.DynamicResourceRequests)
 	}
 	return nodeInfo
 }
