@@ -70,7 +70,7 @@ func getStartupPods(nodeInfo *schedulerframework.NodeInfo, draSnapshot dynamicre
 				pendingDS = append(pendingDS, ds)
 			}
 		}
-		daemonPods, err := daemonset.GetDaemonSetPodsForNode(nodeInfo, pendingDS)
+		daemonPods, err := daemonset.GetDaemonSetPodsForNode(nodeInfo.Node(), pendingDS)
 		if err != nil {
 			return nil, errors.ToAutoscalerError(errors.InternalError, err)
 		}

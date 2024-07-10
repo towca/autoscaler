@@ -56,7 +56,7 @@ func GetNodeInfoFromTemplate(nodeGroup cloudprovider.NodeGroup, daemonsets []*ap
 	// Determine DS pods that will be scheduled on the Node created from this template
 	baseNodeInfo.SetNode(sanitizedNode)
 	baseNodeInfo.SetDynamicResources(sanitizedDynamicResources)
-	startupPods, err := daemonset.GetDaemonSetPodsForNode(baseNodeInfo, daemonsets)
+	startupPods, err := daemonset.GetDaemonSetPodsForNode(baseNodeInfo.Node(), daemonsets)
 	if err != nil {
 		return nil, errors.ToAutoscalerError(errors.InternalError, err)
 	}
