@@ -101,16 +101,12 @@ func FilterOutNodesFromNotAutoscaledGroups(nodes []*apiv1.Node, cloudProvider cl
 
 // DeepCopyNodeInfo clones the provided nodeInfo
 func DeepCopyNodeInfo(nodeInfo *schedulerframework.NodeInfo) *schedulerframework.NodeInfo {
-	newPods := make([]*apiv1.Pod, 0)
+	newPods := make([]clustersnapshot.PodResourceInfo, 0)
 	for _, podInfo := range nodeInfo.Pods {
-		newPods = append(newPods, podInfo.Pod.DeepCopy())
+		newPods = append(newPods, clustersnapshot.PodResourceInfo{Pod: podInfo.Pod.DeepCopy(), DynamicResourceRequests: podInfo.DynamicResourceRequests.DeepCopy()})
 	}
-
-	// Build a new node info.
-	newNodeInfo := schedulerframework.NewNodeInfo(newPods...)
-	newNodeInfo.SetNode(nodeInfo.Node().DeepCopy())
-	newNodeInfo.SetDynamicResources(nodeInfo.DynamicResources().DeepCopy())
-	return newNodeInfo
+	newNode := clustersnapshot.NodeResourceInfo{Node: nodeInfo.Node().DeepCopy(), DynamicResources: nodeInfo.DynamicResources().DeepCopy()}
+	return clustersnapshot.NewNodeInfo(newNode, newPods)
 }
 
 // SanitizeNode cleans up nodes used for node group templates
