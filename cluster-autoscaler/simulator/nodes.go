@@ -21,6 +21,8 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/autoscaler/cluster-autoscaler/dynamicresources"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/daemonset"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
@@ -32,16 +34,16 @@ import (
 // the provided pods currently scheduled on the pods. If forceDaemonSets is true, fake "missing" DS pods are added to the
 // list for DaemonSets that don't have a pod running on the Node but should have.
 //
-// scheduledPods are not modified, the returned pods are not sanitized.
-func NodeStartupPods(node *apiv1.Node, ndr schedulerframework.NodeDynamicResources, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) ([]*apiv1.Pod, errors.AutoscalerError) {
+// scheduledPods are not modified. Neither the returned pods nor the DRA objects are sanitized.
+func NodeStartupPods(node *apiv1.Node, draSnapshot dynamicresources.Snapshot, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) ([]clustersnapshot.PodResourceInfo, errors.AutoscalerError) {
 	nodeInfo := schedulerframework.NewNodeInfo()
 	nodeInfo.SetNode(node)
-	nodeInfo.SetDynamicResources(ndr)
-	return getStartupPods(nodeInfo, scheduledPods, daemonsets, forceDaemonSets)
+	nodeInfo.SetDynamicResources(draSnapshot.NodeResources(node))
+	return getStartupPods(nodeInfo, draSnapshot, scheduledPods, daemonsets, forceDaemonSets)
 }
 
-func getStartupPods(nodeInfo *schedulerframework.NodeInfo, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) ([]*apiv1.Pod, errors.AutoscalerError) {
-	var result []*apiv1.Pod
+func getStartupPods(nodeInfo *schedulerframework.NodeInfo, draSnapshot dynamicresources.Snapshot, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) ([]clustersnapshot.PodResourceInfo, errors.AutoscalerError) {
+	var result []clustersnapshot.PodResourceInfo
 	runningDS := make(map[types.UID]bool)
 	for _, pod := range scheduledPods {
 		// Ignore scheduled pods in deletion phase
@@ -50,8 +52,9 @@ func getStartupPods(nodeInfo *schedulerframework.NodeInfo, scheduledPods []*apiv
 		}
 		// Add scheduled mirror and DS pods
 		if pod_util.IsMirrorPod(pod) || pod_util.IsDaemonSetPod(pod) {
-			nodeInfo.AddPod(pod)
-			result = append(result, pod)
+			resourceInfo := clustersnapshot.NewPodResourceInfo(pod, draSnapshot)
+			nodeInfo.AddPodWithDynamicRequests(resourceInfo.Pod, resourceInfo.DynamicResourceRequests)
+			result = append(result, resourceInfo)
 		}
 		// Mark DS pods as running
 		controllerRef := metav1.GetControllerOf(pod)
@@ -72,7 +75,8 @@ func getStartupPods(nodeInfo *schedulerframework.NodeInfo, scheduledPods []*apiv
 			return nil, errors.ToAutoscalerError(errors.InternalError, err)
 		}
 		for _, pod := range daemonPods {
-			result = append(result, pod)
+			// TODO(DRA): Simulate DRA requests for simulated DS pods.
+			result = append(result, clustersnapshot.PodResourceInfo{Pod: pod, DynamicResourceRequests: schedulerframework.PodDynamicResourceRequests{}})
 		}
 	}
 	return result, nil

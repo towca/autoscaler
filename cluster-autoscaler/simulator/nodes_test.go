@@ -17,6 +17,7 @@ limitations under the License.
 package simulator
 
 import (
+	"k8s.io/autoscaler/cluster-autoscaler/dynamicresources"
 	"strings"
 	"testing"
 	"time"
@@ -28,7 +29,6 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/test"
 	"k8s.io/kubernetes/pkg/controller/daemon"
-	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 func TestNodeStartupPods(t *testing.T) {
@@ -195,7 +195,8 @@ func TestNodeStartupPods(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			startupPods, err := NodeStartupPods(tc.node, schedulerframework.NodeDynamicResources{}, tc.pods, tc.daemonSets, tc.forceDS)
+			// TODO(DRA): Add DRA test cases.
+			startupPods, err := NodeStartupPods(tc.node, dynamicresources.Snapshot{}, tc.pods, tc.daemonSets, tc.forceDS)
 
 			if tc.wantError {
 				assert.Error(t, err)
@@ -208,7 +209,7 @@ func TestNodeStartupPods(t *testing.T) {
 					wantPods = append(wantPods, cleanPodMetadata(pod))
 				}
 				for _, pod := range startupPods {
-					pods = append(pods, cleanPodMetadata(pod))
+					pods = append(pods, cleanPodMetadata(pod.Pod))
 				}
 				assert.ElementsMatch(t, tc.wantPods, pods)
 			}

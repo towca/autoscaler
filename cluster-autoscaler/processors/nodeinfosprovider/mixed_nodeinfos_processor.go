@@ -102,9 +102,13 @@ func (p *MixedTemplateNodeInfoProvider) Process(ctx *context.AutoscalingContext,
 
 			// Based on the pods scheduled on the real Node, and DaemonSets in the cluster, determine which pods
 			// will schedule on a new Node created by "copying" the real one.
-			startupPods, err := simulator.NodeStartupPods(node, dynamicResources, podsForNodes[node.Name], daemonsets, p.forceDaemonSets)
+			sPods, err := simulator.NodeStartupPods(node, ctx.ClusterSnapshot.DraObjectsSource, podsForNodes[node.Name], daemonsets, p.forceDaemonSets)
 			if err != nil {
 				return false, "", err
+			}
+			var startupPods []*apiv1.Pod
+			for _, pod := range sPods {
+				startupPods = append(startupPods, pod.Pod)
 			}
 
 			// Deep copy and sanitize a real Node into a fake
