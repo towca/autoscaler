@@ -147,8 +147,7 @@ func (data *internalBasicSnapshotData) addNode(node NodeResourceInfo) error {
 		return fmt.Errorf("node %s already in snapshot", node.Node.Name)
 	}
 	nodeInfo := schedulerframework.NewNodeInfo()
-	nodeInfo.SetNode(node.Node)
-	nodeInfo.SetDynamicResources(node.DynamicResources)
+	nodeInfo.SetNodeWithDynamicResources(node.Node, node.DynamicResources)
 	data.nodeInfoMap[node.Node.Name] = nodeInfo
 	return nil
 }

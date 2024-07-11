@@ -56,8 +56,7 @@ func DeepCopyTemplateNode(nodeTemplate *schedulerframework.NodeInfo, suffix stri
 	}
 	node.Labels["kubernetes.io/hostname"] = node.Name
 	nodeInfo := schedulerframework.NewNodeInfo()
-	nodeInfo.SetNode(node)
-	nodeInfo.SetDynamicResources(dynamicresources.SanitizedNodeDynamicResources(nodeTemplate.DynamicResources(), node.Name, suffix))
+	nodeInfo.SetNodeWithDynamicResources(node, dynamicresources.SanitizedNodeDynamicResources(nodeTemplate.DynamicResources(), node.Name, suffix))
 	for _, podInfo := range nodeTemplate.Pods {
 		sanitizedPod := utils.SanitizePod(clustersnapshot.PodResourceInfo{Pod: podInfo.Pod, DynamicResourceRequests: podInfo.DynamicResourceRequests}, node.Name, suffix)
 		nodeInfo.AddPodWithDynamicRequests(sanitizedPod.Pod, sanitizedPod.DynamicResourceRequests)
