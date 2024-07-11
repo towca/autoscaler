@@ -59,8 +59,7 @@ func ResourceInfos(nodeInfo *schedulerframework.NodeInfo) (NodeResourceInfo, []P
 // NewNodeInfo creates a new NodeInfo based on a Node and its Pods, as well as any associated DRA objects.
 func NewNodeInfo(node NodeResourceInfo, pods []PodResourceInfo) *schedulerframework.NodeInfo {
 	result := schedulerframework.NewNodeInfo()
-	result.SetNode(node.Node)
-	result.SetDynamicResources(node.DynamicResources)
+	result.SetNodeWithDynamicResources(node.Node, node.DynamicResources)
 	for _, pod := range pods {
 		result.AddPodWithDynamicRequests(pod.Pod, pod.DynamicResourceRequests)
 	}

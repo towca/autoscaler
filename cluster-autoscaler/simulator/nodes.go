@@ -37,8 +37,7 @@ import (
 // scheduledPods are not modified. Neither the returned pods nor the DRA objects are sanitized.
 func NodeStartupPods(node *apiv1.Node, draSnapshot dynamicresources.Snapshot, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) ([]clustersnapshot.PodResourceInfo, errors.AutoscalerError) {
 	nodeInfo := schedulerframework.NewNodeInfo()
-	nodeInfo.SetNode(node)
-	nodeInfo.SetDynamicResources(draSnapshot.NodeResources(node))
+	nodeInfo.SetNodeWithDynamicResources(node, draSnapshot.NodeResources(node))
 	return getStartupPods(nodeInfo, draSnapshot, scheduledPods, daemonsets, forceDaemonSets)
 }
 
