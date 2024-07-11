@@ -46,8 +46,10 @@ func GetNodeInfoFromTemplate(nodeGroup cloudprovider.NodeGroup, daemonsets []*ap
 
 	labels.UpdateDeprecatedLabels(baseNodeInfo.Node().ObjectMeta.Labels)
 
+	randSuffix := fmt.Sprintf("%d", rand.Int63())
+
 	// Deep copy and sanitize the template node and the associated DRA objects returned from the cloud provider
-	sanitizedNode, typedErr := SanitizeNode(clustersnapshot.NodeResourceInfo{Node: baseNodeInfo.Node(), DynamicResources: baseNodeInfo.DynamicResources()}, id, taintConfig)
+	sanitizedNode, typedErr := SanitizeNode(clustersnapshot.NodeResourceInfo{Node: baseNodeInfo.Node(), DynamicResources: baseNodeInfo.DynamicResources()}, id, taintConfig, randSuffix)
 	if err != nil {
 		return nil, typedErr
 	}
@@ -67,7 +69,7 @@ func GetNodeInfoFromTemplate(nodeGroup cloudprovider.NodeGroup, daemonsets []*ap
 		startupPods = append(startupPods, clustersnapshot.PodResourceInfo{Pod: podInfo.Pod, DynamicResourceRequests: podInfo.DynamicResourceRequests})
 	}
 	// Deep copy and sanitize the startup Pods and the associated DRA objects into fakes pointing to the fake sanitized Node
-	sanitizedStartupPods := SanitizePods(startupPods, sanitizedNode.Node.Name, fmt.Sprintf("%d", rand.Int63()))
+	sanitizedStartupPods := SanitizePods(startupPods, sanitizedNode.Node.Name, randSuffix)
 
 	// Build the final node info with all 3 parts (Node, Pods, DRA objects) sanitized and in sync.
 	return clustersnapshot.NewNodeInfo(sanitizedNode, sanitizedStartupPods), nil
@@ -110,10 +112,9 @@ func DeepCopyNodeInfo(nodeInfo *schedulerframework.NodeInfo) *schedulerframework
 }
 
 // SanitizeNode cleans up nodes used for node group templates
-func SanitizeNode(nodeResInfo clustersnapshot.NodeResourceInfo, nodeGroup string, taintConfig taints.TaintConfig) (clustersnapshot.NodeResourceInfo, errors.AutoscalerError) {
+func SanitizeNode(nodeResInfo clustersnapshot.NodeResourceInfo, nodeGroup string, taintConfig taints.TaintConfig, nameSuffix string) (clustersnapshot.NodeResourceInfo, errors.AutoscalerError) {
 	newNode := nodeResInfo.Node.DeepCopy()
-	randSuffix := fmt.Sprintf("%d", rand.Int63())
-	nodeName := fmt.Sprintf("template-node-for-%s-%s", nodeGroup, randSuffix)
+	nodeName := fmt.Sprintf("template-node-for-%s-%s", nodeGroup, nameSuffix)
 	newNode.Labels = make(map[string]string, len(nodeResInfo.Node.Labels))
 	for k, v := range nodeResInfo.Node.Labels {
 		if k != apiv1.LabelHostname {
@@ -124,7 +125,7 @@ func SanitizeNode(nodeResInfo clustersnapshot.NodeResourceInfo, nodeGroup string
 	}
 	newNode.Name = nodeName
 	newNode.Spec.Taints = taints.SanitizeTaints(newNode.Spec.Taints, taintConfig)
-	newDynamicResources := dynamicresources.SanitizedNodeDynamicResources(nodeResInfo.DynamicResources, newNode.Name, randSuffix)
+	newDynamicResources := dynamicresources.SanitizedNodeDynamicResources(nodeResInfo.DynamicResources, newNode.Name, nameSuffix)
 	return clustersnapshot.NodeResourceInfo{Node: newNode, DynamicResources: newDynamicResources}, nil
 }
 

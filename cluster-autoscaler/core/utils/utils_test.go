@@ -17,10 +17,11 @@ limitations under the License.
 package utils
 
 import (
-	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"strings"
 	"testing"
 	"time"
+
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 
 	"k8s.io/autoscaler/cluster-autoscaler/utils/taints"
 	. "k8s.io/autoscaler/cluster-autoscaler/utils/test"
@@ -56,7 +57,7 @@ func TestSanitizeLabels(t *testing.T) {
 		apiv1.LabelHostname: "abc",
 		"x":                 "y",
 	}
-	node, err := SanitizeNode(oldNode, "bzium", taints.TaintConfig{})
+	node, err := SanitizeNode(oldNode, "bzium", taints.TaintConfig{}, "abc")
 	assert.NoError(t, err)
 	assert.NotEqual(t, node.Node.Labels[apiv1.LabelHostname], "abc", nil)
 	assert.Equal(t, node.Node.Labels["x"], "y")
