@@ -104,14 +104,16 @@ func (p *MixedTemplateNodeInfoProvider) Process(ctx *context.AutoscalingContext,
 				return false, "", err
 			}
 
+			randSuffix := fmt.Sprintf("%d", rand.Int63())
+
 			// Deep copy and sanitize a real Node (and its associated DRA objects) into a fake
-			sanitizedNode, err := utils.SanitizeNode(clustersnapshot.NewNodeResourceInfo(node, ctx.ClusterSnapshot.DraObjectsSource), id, taintConfig)
+			sanitizedNode, err := utils.SanitizeNode(clustersnapshot.NewNodeResourceInfo(node, ctx.ClusterSnapshot.DraObjectsSource), id, taintConfig, randSuffix)
 			if err != nil {
 				return false, "", err
 			}
 
 			// Deep copy and sanitize the startup Pods (and their associated DRA objects) into fakes pointing to the fake sanitized Node.
-			sanitizedStartupPods := utils.SanitizePods(startupPods, sanitizedNode.Node.Name, fmt.Sprintf("%d", rand.Int63()))
+			sanitizedStartupPods := utils.SanitizePods(startupPods, sanitizedNode.Node.Name, randSuffix)
 
 			// Build the final node info with all 3 parts (Node, Pods, DRA objects) sanitized and in sync.
 			result[id] = clustersnapshot.NewNodeInfo(sanitizedNode, sanitizedStartupPods)
