@@ -19,7 +19,7 @@ func SanitizedNodeDynamicResources(ndr schedulerframework.NodeDynamicResources, 
 	for _, slice := range sanitizedNdr.ResourceSlices {
 		slice.Name = fmt.Sprintf("%s-%s", slice.Name, nameSuffix)
 		slice.UID = uuid.NewUUID()
-		slice.NodeName = nodeName
+		slice.Spec.NodeName = nodeName
 	}
 	return sanitizedNdr
 }
@@ -35,10 +35,6 @@ func SanitizedPodDynamicResourceRequests(pdr schedulerframework.PodDynamicResour
 	for _, claim := range sanitizedPdr.ResourceClaims {
 		claim.Name = fmt.Sprintf("%s-%s", claim.Name, nameSuffix)
 		claim.UID = uuid.NewUUID()
-	}
-	for _, params := range sanitizedPdr.ResourceClaimParameters {
-		params.Name = fmt.Sprintf("%s-%s", params.Name, nameSuffix)
-		params.UID = uuid.NewUUID()
 	}
 	return sanitizedPdr
 }
