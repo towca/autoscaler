@@ -61,21 +61,29 @@ func IsStaticPod(pod *apiv1.Pod) bool {
 func FilterRecreatablePods(pods []*apiv1.Pod) []*apiv1.Pod {
 	filtered := make([]*apiv1.Pod, 0, len(pods))
 	for _, p := range pods {
-		if IsStaticPod(p) || IsMirrorPod(p) || IsDaemonSetPod(p) {
-			continue
+		if IsRecreatablePod(p) {
+			filtered = append(filtered, p)
 		}
-		filtered = append(filtered, p)
 	}
 	return filtered
+}
+
+// IsRecreatablePod returns whether a pod will be recreated by its controller.
+func IsRecreatablePod(pod *apiv1.Pod) bool {
+	return !IsStaticPod(pod) && !IsMirrorPod(pod) && !IsDaemonSetPod(pod)
 }
 
 // ClearPodNodeNames removes node name from pods
 func ClearPodNodeNames(pods []*apiv1.Pod) []*apiv1.Pod {
 	newPods := make([]*apiv1.Pod, 0, len(pods))
 	for _, podPtr := range pods {
-		newPod := *podPtr
-		newPod.Spec.NodeName = ""
-		newPods = append(newPods, &newPod)
+		newPods = append(newPods, ClearPodName(podPtr))
 	}
 	return newPods
+}
+
+func ClearPodName(pod *apiv1.Pod) *apiv1.Pod {
+	newPod := *pod
+	newPod.Spec.NodeName = ""
+	return &newPod
 }

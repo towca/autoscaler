@@ -32,9 +32,9 @@ import (
 func TestFilterOutExpendable(t *testing.T) {
 	testCases := []struct {
 		name               string
-		pods               []*apiv1.Pod
-		wantPods           []*apiv1.Pod
-		wantPodsInSnapshot []*apiv1.Pod
+		pods               []*clustersnapshot.PodResourceInfo
+		wantPods           []*clustersnapshot.PodResourceInfo
+		wantPodsInSnapshot []*clustersnapshot.PodResourceInfo
 		priorityCutoff     int
 		nodes              []*apiv1.Node
 	}{
@@ -43,61 +43,61 @@ func TestFilterOutExpendable(t *testing.T) {
 		},
 		{
 			name: "single non-expendable pod",
-			pods: []*apiv1.Pod{
-				test.BuildTestPod("p", 1000, 1),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p", 1000, 1)},
 			},
-			wantPods: []*apiv1.Pod{
-				test.BuildTestPod("p", 1000, 1),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p", 1000, 1)},
 			},
 		},
 		{
 			name: "non-expendable pods with priority >= to cutoff priority",
-			pods: []*apiv1.Pod{
-				test.BuildTestPod("p1", 1000, 1, priority(2)),
-				test.BuildTestPod("p2", 1000, 1, priority(3)),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p1", 1000, 1, priority(2))},
+				{Pod: test.BuildTestPod("p2", 1000, 1, priority(3))},
 			},
-			wantPods: []*apiv1.Pod{
-				test.BuildTestPod("p1", 1000, 1, priority(2)),
-				test.BuildTestPod("p2", 1000, 1, priority(3)),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p1", 1000, 1, priority(2))},
+				{Pod: test.BuildTestPod("p2", 1000, 1, priority(3))},
 			},
 			priorityCutoff: 2,
 		},
 		{
 			name: "single expednable pod",
-			pods: []*apiv1.Pod{
-				test.BuildTestPod("p", 1000, 1, priority(2)),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p", 1000, 1, priority(2))},
 			},
 			priorityCutoff: 3,
 		},
 		{
 			name: "single waiting-for-low-priority-preemption pod",
-			pods: []*apiv1.Pod{
-				test.BuildTestPod("p", 1000, 1, nominatedNodeName("node-1")),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p", 1000, 1, nominatedNodeName("node-1"))},
 			},
 			nodes: []*apiv1.Node{
 				test.BuildTestNode("node-1", 2400, 2400),
 			},
-			wantPodsInSnapshot: []*apiv1.Pod{
-				test.BuildTestPod("p", 1000, 1, nominatedNodeName("node-1")),
+			wantPodsInSnapshot: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p", 1000, 1, nominatedNodeName("node-1"))},
 			},
 		},
 		{
 			name: "mixed expendable, non-expendable & waiting-for-low-priority-preemption pods",
-			pods: []*apiv1.Pod{
-				test.BuildTestPod("p1", 1000, 1, priority(3)),
-				test.BuildTestPod("p2", 1000, 1, priority(4)),
-				test.BuildTestPod("p3", 1000, 1, priority(1)),
-				test.BuildTestPod("p4", 1000, 1),
-				test.BuildTestPod("p5", 1000, 1, nominatedNodeName("node-1")),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p1", 1000, 1, priority(3))},
+				{Pod: test.BuildTestPod("p2", 1000, 1, priority(4))},
+				{Pod: test.BuildTestPod("p3", 1000, 1, priority(1))},
+				{Pod: test.BuildTestPod("p4", 1000, 1)},
+				{Pod: test.BuildTestPod("p5", 1000, 1, nominatedNodeName("node-1"))},
 			},
 			priorityCutoff: 2,
-			wantPods: []*apiv1.Pod{
-				test.BuildTestPod("p1", 1000, 1, priority(3)),
-				test.BuildTestPod("p2", 1000, 1, priority(4)),
-				test.BuildTestPod("p4", 1000, 1),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p1", 1000, 1, priority(3))},
+				{Pod: test.BuildTestPod("p2", 1000, 1, priority(4))},
+				{Pod: test.BuildTestPod("p4", 1000, 1)},
 			},
-			wantPodsInSnapshot: []*apiv1.Pod{
-				test.BuildTestPod("p5", 1000, 1, nominatedNodeName("node-1")),
+			wantPodsInSnapshot: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p5", 1000, 1, nominatedNodeName("node-1"))},
 			},
 			nodes: []*apiv1.Node{
 				test.BuildTestNode("node-1", 2400, 2400),
@@ -124,15 +124,16 @@ func TestFilterOutExpendable(t *testing.T) {
 			assert.NoError(t, err)
 			assert.ElementsMatch(t, tc.wantPods, pods)
 
-			var podsInSnapshot []*apiv1.Pod
+			var podsInSnapshot []*clustersnapshot.PodResourceInfo
 			nodeInfoLister := snapshot.NodeInfos()
 			// Get pods in snapshot
 			for _, n := range tc.nodes {
 				nodeInfo, err := nodeInfoLister.Get(n.Name)
 				assert.NoError(t, err)
 				assert.NotEqual(t, nodeInfo.Pods, nil)
-				for _, podInfo := range nodeInfo.Pods {
-					podsInSnapshot = append(podsInSnapshot, podInfo.Pod)
+				_, podReqs := clustersnapshot.ResourceInfos(nodeInfo)
+				for _, pod := range podReqs {
+					podsInSnapshot = append(podsInSnapshot, pod)
 				}
 			}
 

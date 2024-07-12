@@ -21,6 +21,7 @@ import (
 	"testing"
 
 	"k8s.io/apimachinery/pkg/api/resource"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	. "k8s.io/autoscaler/cluster-autoscaler/utils/test"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -46,12 +47,12 @@ func testContainer(requests requests) apiv1.Container {
 	return container
 }
 
-func testPod(name string, containers ...requests) *apiv1.Pod {
+func testPod(name string, containers ...requests) *clustersnapshot.PodResourceInfo {
 	pod := BuildTestPod(name, 0, 0)
 	for _, requests := range containers[1:] {
 		pod.Spec.Containers = append(pod.Spec.Containers, testContainer(requests))
 	}
-	return pod
+	return &clustersnapshot.PodResourceInfo{Pod: pod}
 }
 
 func TestClearTPURequests(t *testing.T) {
@@ -65,18 +66,18 @@ func TestClearTPURequests(t *testing.T) {
 	tpuMemoryPod := testPod("tpuMemoryPod", requests{apiv1.ResourceName(ResourceTPUV2): 1, apiv1.ResourceMemory: 30}, requests{apiv1.ResourceName(ResourceTPUV2): 2, apiv1.ResourceMemory: 13})
 	sanitizedTPUMemoryPod := testPod("tpuMemoryPod", requests{apiv1.ResourceMemory: 30}, requests{apiv1.ResourceMemory: 13})
 
-	podsWithoutTPUs := []*apiv1.Pod{cpuPod, memoryPod, cpuMemoryPod}
-	mixedPods := []*apiv1.Pod{cpuPod, tpuPod, preemptibleTPUPod, memoryPod}
-	sanitizedMixedPods := []*apiv1.Pod{cpuPod, sanitizedTPUPod, sanitizedPreemptibleTPUPod, memoryPod}
-	podsWithTPUs := []*apiv1.Pod{tpuPod, preemptibleTPUPod, tpuMemoryPod}
-	sanitizedPodsWithTPUs := []*apiv1.Pod{sanitizedTPUPod, sanitizedPreemptibleTPUPod, sanitizedTPUMemoryPod}
+	podsWithoutTPUs := []*clustersnapshot.PodResourceInfo{cpuPod, memoryPod, cpuMemoryPod}
+	mixedPods := []*clustersnapshot.PodResourceInfo{cpuPod, tpuPod, preemptibleTPUPod, memoryPod}
+	sanitizedMixedPods := []*clustersnapshot.PodResourceInfo{cpuPod, sanitizedTPUPod, sanitizedPreemptibleTPUPod, memoryPod}
+	podsWithTPUs := []*clustersnapshot.PodResourceInfo{tpuPod, preemptibleTPUPod, tpuMemoryPod}
+	sanitizedPodsWithTPUs := []*clustersnapshot.PodResourceInfo{sanitizedTPUPod, sanitizedPreemptibleTPUPod, sanitizedTPUMemoryPod}
 
 	testCases := []struct {
 		desc     string
-		pods     []*apiv1.Pod
-		expected []*apiv1.Pod
+		pods     []*clustersnapshot.PodResourceInfo
+		expected []*clustersnapshot.PodResourceInfo
 	}{
-		{"Empty pod list", []*apiv1.Pod{}, []*apiv1.Pod{}},
+		{"Empty pod list", []*clustersnapshot.PodResourceInfo{}, []*clustersnapshot.PodResourceInfo{}},
 		{
 			desc:     "Pods without TPU request",
 			pods:     podsWithoutTPUs,
@@ -96,7 +97,7 @@ func TestClearTPURequests(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.desc, func(t *testing.T) {
-			copied := make([]*apiv1.Pod, len(tc.pods))
+			copied := make([]*clustersnapshot.PodResourceInfo, len(tc.pods))
 			for i, pod := range tc.pods {
 				copied[i] = pod.DeepCopy()
 			}

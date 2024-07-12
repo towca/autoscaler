@@ -17,28 +17,28 @@ limitations under the License.
 package podinjection
 
 import (
-	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 )
 
 type podGroup struct {
 	podCount        int
 	desiredReplicas int
-	sample          *apiv1.Pod
+	sample          *clustersnapshot.PodResourceInfo
 	ownerUid        types.UID
 }
 
 // groupPods creates a map of controller uids and podGroups.
 // If a controller for some pods is not found, such pods are ignored and not grouped
-func groupPods(pods []*apiv1.Pod, controllers []controller) map[types.UID]podGroup {
+func groupPods(pods []*clustersnapshot.PodResourceInfo, controllers []controller) map[types.UID]podGroup {
 	podGroups := map[types.UID]podGroup{}
 	for _, con := range controllers {
 		podGroups[con.uid] = makePodGroup(con.desiredReplicas)
 	}
 
 	for _, pod := range pods {
-		for _, ownerRef := range pod.OwnerReferences {
+		for _, ownerRef := range pod.Pod.OwnerReferences {
 			podGroups = updatePodGroups(pod, ownerRef, podGroups)
 		}
 	}
@@ -46,7 +46,7 @@ func groupPods(pods []*apiv1.Pod, controllers []controller) map[types.UID]podGro
 }
 
 // updatePodGroups updates the pod group if ownerRef is the controller of the pod
-func updatePodGroups(pod *apiv1.Pod, ownerRef metav1.OwnerReference, podGroups map[types.UID]podGroup) map[types.UID]podGroup {
+func updatePodGroups(pod *clustersnapshot.PodResourceInfo, ownerRef metav1.OwnerReference, podGroups map[types.UID]podGroup) map[types.UID]podGroup {
 	if ownerRef.Controller == nil {
 		return podGroups
 	}
@@ -57,7 +57,7 @@ func updatePodGroups(pod *apiv1.Pod, ownerRef metav1.OwnerReference, podGroups m
 	if !found {
 		return podGroups
 	}
-	if group.sample == nil && pod.Spec.NodeName == "" {
+	if group.sample == nil && pod.Pod.Spec.NodeName == "" {
 		group.sample = pod
 		group.ownerUid = ownerRef.UID
 	}

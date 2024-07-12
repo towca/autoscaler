@@ -17,15 +17,15 @@ limitations under the License.
 package pods
 
 import (
-	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 )
 
 // PodListProcessor processes lists of unschedulable pods.
 type PodListProcessor interface {
 	Process(
 		context *context.AutoscalingContext,
-		unschedulablePods []*apiv1.Pod) ([]*apiv1.Pod, error)
+		unschedulablePods []*clustersnapshot.PodResourceInfo) ([]*clustersnapshot.PodResourceInfo, error)
 	CleanUp()
 }
 
@@ -41,7 +41,7 @@ func NewDefaultPodListProcessor() PodListProcessor {
 // Process processes lists of unschedulable and scheduled pods before scaling of the cluster.
 func (p *NoOpPodListProcessor) Process(
 	context *context.AutoscalingContext,
-	unschedulablePods []*apiv1.Pod) ([]*apiv1.Pod, error) {
+	unschedulablePods []*clustersnapshot.PodResourceInfo) ([]*clustersnapshot.PodResourceInfo, error) {
 	return unschedulablePods, nil
 }
 
@@ -65,7 +65,7 @@ func (p *CombinedPodListProcessor) AddProcessor(processor PodListProcessor) {
 }
 
 // Process runs sub-processors sequentially
-func (p *CombinedPodListProcessor) Process(ctx *context.AutoscalingContext, unschedulablePods []*apiv1.Pod) ([]*apiv1.Pod, error) {
+func (p *CombinedPodListProcessor) Process(ctx *context.AutoscalingContext, unschedulablePods []*clustersnapshot.PodResourceInfo) ([]*clustersnapshot.PodResourceInfo, error) {
 	var err error
 	for _, processor := range p.processors {
 		unschedulablePods, err = processor.Process(ctx, unschedulablePods)

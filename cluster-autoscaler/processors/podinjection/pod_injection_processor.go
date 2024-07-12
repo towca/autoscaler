@@ -23,7 +23,9 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
+	"k8s.io/autoscaler/cluster-autoscaler/core/utils"
 	podinjectionbackoff "k8s.io/autoscaler/cluster-autoscaler/processors/podinjection/backoff"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -55,7 +57,7 @@ func NewPodInjectionPodListProcessor(fakePodRegistry *podinjectionbackoff.Contro
 }
 
 // Process updates unschedulablePods by injecting fake pods to match target replica count
-func (p *PodInjectionPodListProcessor) Process(ctx *context.AutoscalingContext, unschedulablePods []*apiv1.Pod) ([]*apiv1.Pod, error) {
+func (p *PodInjectionPodListProcessor) Process(ctx *context.AutoscalingContext, unschedulablePods []*clustersnapshot.PodResourceInfo) ([]*clustersnapshot.PodResourceInfo, error) {
 
 	controllers := listControllers(ctx)
 	controllers = p.skipBackedoffControllers(controllers)
@@ -68,7 +70,7 @@ func (p *PodInjectionPodListProcessor) Process(ctx *context.AutoscalingContext, 
 	scheduledPods := podsFromNodeInfos(nodeInfos)
 
 	groupedPods := groupPods(append(scheduledPods, unschedulablePods...), controllers)
-	var podsToInject []*apiv1.Pod
+	var podsToInject []*clustersnapshot.PodResourceInfo
 
 	for _, groupedPod := range groupedPods {
 		var fakePodCount = groupedPod.fakePodCount()
@@ -87,12 +89,13 @@ func (p *PodInjectionPodListProcessor) CleanUp() {
 
 // makeFakePods creates podCount number of copies of the sample pod
 // makeFakePods also adds annotation to the pod to be marked as "fake"
-func makeFakePods(ownerUid types.UID, samplePod *apiv1.Pod, podCount int) []*apiv1.Pod {
-	var fakePods []*apiv1.Pod
+func makeFakePods(ownerUid types.UID, samplePod *clustersnapshot.PodResourceInfo, podCount int) []*clustersnapshot.PodResourceInfo {
+	var fakePods []*clustersnapshot.PodResourceInfo
 	for i := 1; i <= podCount; i++ {
-		newPod := withFakePodAnnotation(samplePod.DeepCopy())
-		newPod.Name = fmt.Sprintf("%s-copy-%d", samplePod.Name, i)
-		newPod.UID = types.UID(fmt.Sprintf("%s-%d", string(ownerUid), i))
+		// TODO(DRA): Review sanitization.
+		newPod := utils.SanitizePod(samplePod, "", fmt.Sprintf("copy-%d", i))
+		newPod.Pod = withFakePodAnnotation(newPod.Pod)
+		newPod.Pod.UID = types.UID(fmt.Sprintf("%s-%d", string(ownerUid), i))
 		fakePods = append(fakePods, newPod)
 	}
 	return fakePods
@@ -122,14 +125,13 @@ func (p *podGroup) fakePodCount() int {
 }
 
 // podsFromNodeInfos return all the pods in the nodeInfos
-func podsFromNodeInfos(nodeInfos []*framework.NodeInfo) []*apiv1.Pod {
-	var pods []*apiv1.Pod
+func podsFromNodeInfos(nodeInfos []*framework.NodeInfo) []*clustersnapshot.PodResourceInfo {
+	var result []*clustersnapshot.PodResourceInfo
 	for _, nodeInfo := range nodeInfos {
-		for _, podInfo := range nodeInfo.Pods {
-			pods = append(pods, podInfo.Pod)
-		}
+		_, podResourceInfos := clustersnapshot.ResourceInfos(nodeInfo)
+		result = append(result, podResourceInfos...)
 	}
-	return pods
+	return result
 }
 
 // listControllers returns the list of controllers that can be used to inject fake pods

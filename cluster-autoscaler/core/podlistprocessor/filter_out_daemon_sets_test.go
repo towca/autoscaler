@@ -20,48 +20,48 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/test"
 )
 
 func TestFilterOutDaemonSetPodListProcessor(t *testing.T) {
 	testCases := []struct {
 		name     string
-		pods     []*apiv1.Pod
-		wantPods []*apiv1.Pod
+		pods     []*clustersnapshot.PodResourceInfo
+		wantPods []*clustersnapshot.PodResourceInfo
 	}{
 		{
 			name: "no pods",
 		},
 		{
 			name: "single non-DS pod",
-			pods: []*apiv1.Pod{
-				test.BuildTestPod("p", 1000, 1),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p", 1000, 1)},
 			},
-			wantPods: []*apiv1.Pod{
-				test.BuildTestPod("p", 1000, 1),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p", 1000, 1)},
 			},
 		},
 		{
 			name: "single DS pod",
-			pods: []*apiv1.Pod{
-				test.SetDSPodSpec(test.BuildTestPod("p", 1000, 1)),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.SetDSPodSpec(test.BuildTestPod("p", 1000, 1))},
 			},
 		},
 		{
 			name: "mixed DS and non-DS pods",
-			pods: []*apiv1.Pod{
-				test.BuildTestPod("p1", 1000, 1),
-				test.SetDSPodSpec(test.BuildTestPod("p2", 1000, 1)),
-				test.SetDSPodSpec(test.BuildTestPod("p3", 1000, 1)),
-				test.BuildTestPod("p4", 1000, 1),
-				test.BuildTestPod("p5", 1000, 1),
-				test.SetDSPodSpec(test.BuildTestPod("p6", 1000, 1)),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p1", 1000, 1)},
+				{Pod: test.SetDSPodSpec(test.BuildTestPod("p2", 1000, 1))},
+				{Pod: test.SetDSPodSpec(test.BuildTestPod("p3", 1000, 1))},
+				{Pod: test.BuildTestPod("p4", 1000, 1)},
+				{Pod: test.BuildTestPod("p5", 1000, 1)},
+				{Pod: test.SetDSPodSpec(test.BuildTestPod("p6", 1000, 1))},
 			},
-			wantPods: []*apiv1.Pod{
-				test.BuildTestPod("p1", 1000, 1),
-				test.BuildTestPod("p4", 1000, 1),
-				test.BuildTestPod("p5", 1000, 1),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: test.BuildTestPod("p1", 1000, 1)},
+				{Pod: test.BuildTestPod("p4", 1000, 1)},
+				{Pod: test.BuildTestPod("p5", 1000, 1)},
 			},
 		},
 	}

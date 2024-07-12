@@ -17,10 +17,10 @@ limitations under the License.
 package podinjection
 
 import (
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 )
 
@@ -32,7 +32,7 @@ func TestEnforceInjectedPodsLimitProcessor(t *testing.T) {
 	testCases := []struct {
 		name                                          string
 		podLimit                                      int
-		unschedulablePods                             []*apiv1.Pod
+		unschedulablePods                             []*clustersnapshot.PodResourceInfo
 		expectedNumberOfResultedUnschedulablePods     int
 		expectedNumberOfResultedUnschedulableFakePods int
 		expectedNumberOfResultedUnschedulableRealPods int
@@ -107,18 +107,18 @@ func TestEnforceInjectedPodsLimitProcessor(t *testing.T) {
 	}
 }
 
-func numberOfFakePods(pods []*apiv1.Pod) int {
+func numberOfFakePods(pods []*clustersnapshot.PodResourceInfo) int {
 	numberOfFakePods := 0
 	for _, pod := range pods {
-		if IsFake(pod) {
+		if IsFake(pod.Pod) {
 			numberOfFakePods += 1
 		}
 	}
 	return numberOfFakePods
 }
 
-func makeTestingPods(numberOfRealTestPods int) []*apiv1.Pod {
-	var testingPods []*apiv1.Pod
+func makeTestingPods(numberOfRealTestPods int) []*clustersnapshot.PodResourceInfo {
+	var testingPods []*clustersnapshot.PodResourceInfo
 	for range numberOfRealTestPods {
 		testingPods = append(testingPods, buildTestPod("default", "test-pod"))
 	}

@@ -19,7 +19,6 @@ package provreq
 import (
 	"time"
 
-	apiv1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/apis/provisioningrequest/autoscaling.x-k8s.io/v1"
@@ -29,6 +28,7 @@ import (
 	provreqconditions "k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/conditions"
 	provreqpods "k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/pods"
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/provreqclient"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/client-go/rest"
 	"k8s.io/klog/v2"
 	"k8s.io/utils/clock"
@@ -47,8 +47,8 @@ type ProvisioningRequestPodsInjector struct {
 // Process pick one ProvisioningRequest, update Accepted condition and inject pods to unscheduled pods list.
 func (p *ProvisioningRequestPodsInjector) Process(
 	_ *context.AutoscalingContext,
-	unschedulablePods []*apiv1.Pod,
-) ([]*apiv1.Pod, error) {
+	unschedulablePods []*clustersnapshot.PodResourceInfo,
+) ([]*clustersnapshot.PodResourceInfo, error) {
 	provReqs, err := p.client.ProvisioningRequests()
 	if err != nil {
 		return nil, err
@@ -90,7 +90,10 @@ func (p *ProvisioningRequestPodsInjector) Process(
 				klog.Errorf("failed add Accepted condition to ProvReq %s/%s, err: %v", pr.Namespace, pr.Name, err)
 				continue
 			}
-			unschedulablePods := append(unschedulablePods, provreqpods...)
+			for _, provReqPod := range provreqpods {
+				// TODO(DRA): Evaluate DRA vs ProvReq.
+				unschedulablePods = append(unschedulablePods, &clustersnapshot.PodResourceInfo{Pod: provReqPod})
+			}
 			return unschedulablePods, nil
 		}
 	}

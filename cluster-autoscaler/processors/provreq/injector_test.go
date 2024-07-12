@@ -21,12 +21,12 @@ import (
 	"testing"
 	"time"
 
-	corev1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/apis/provisioningrequest/autoscaling.x-k8s.io/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/provreqclient"
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/provreqwrapper"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	clock "k8s.io/utils/clock/testing"
 )
 
@@ -118,7 +118,7 @@ func TestProvisioningRequestPodsInjector(t *testing.T) {
 	for _, tc := range testCases {
 		client := provreqclient.NewFakeProvisioningRequestClient(context.Background(), t, tc.provReqs...)
 		injector := ProvisioningRequestPodsInjector{client, clock.NewFakePassiveClock(now)}
-		getUnscheduledPods, err := injector.Process(nil, []*corev1.Pod{})
+		getUnscheduledPods, err := injector.Process(nil, []*clustersnapshot.PodResourceInfo{})
 		if err != nil {
 			t.Errorf("%s failed: injector.Process return error %v", tc.name, err)
 		}

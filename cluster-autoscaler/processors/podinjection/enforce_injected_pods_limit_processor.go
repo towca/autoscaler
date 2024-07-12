@@ -17,8 +17,8 @@ limitations under the License.
 package podinjection
 
 import (
-	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 )
 
 // EnforceInjectedPodsLimitProcessor is a PodListProcessor used to limit the number of injected fake pods.
@@ -34,13 +34,13 @@ func NewEnforceInjectedPodsLimitProcessor(podLimit int) *EnforceInjectedPodsLimi
 }
 
 // Process filters unschedulablePods and enforces the limit of the number of injected pods
-func (p *EnforceInjectedPodsLimitProcessor) Process(ctx *context.AutoscalingContext, unschedulablePods []*apiv1.Pod) ([]*apiv1.Pod, error) {
+func (p *EnforceInjectedPodsLimitProcessor) Process(ctx *context.AutoscalingContext, unschedulablePods []*clustersnapshot.PodResourceInfo) ([]*clustersnapshot.PodResourceInfo, error) {
 
 	numberOfFakePodsToRemove := len(unschedulablePods) - p.podLimit
-	var unschedulablePodsAfterProcessing []*apiv1.Pod
+	var unschedulablePodsAfterProcessing []*clustersnapshot.PodResourceInfo
 
 	for _, pod := range unschedulablePods {
-		if IsFake(pod) && numberOfFakePodsToRemove > 0 {
+		if IsFake(pod.Pod) && numberOfFakePodsToRemove > 0 {
 			numberOfFakePodsToRemove -= 1
 			continue
 		}

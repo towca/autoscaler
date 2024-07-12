@@ -19,7 +19,6 @@ package podlistprocessor
 import (
 	"fmt"
 
-	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 	core_utils "k8s.io/autoscaler/cluster-autoscaler/core/utils"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
@@ -36,7 +35,7 @@ func NewFilterOutExpendablePodListProcessor() *filterOutExpendable {
 }
 
 // Process filters out pods which are expendable and adds pods which is waiting for lower priority pods preemption to the cluster snapshot
-func (p *filterOutExpendable) Process(context *context.AutoscalingContext, pods []*apiv1.Pod) ([]*apiv1.Pod, error) {
+func (p *filterOutExpendable) Process(context *context.AutoscalingContext, pods []*clustersnapshot.PodResourceInfo) ([]*clustersnapshot.PodResourceInfo, error) {
 	nodes, err := context.AllNodeLister().List()
 	if err != nil {
 		return nil, fmt.Errorf("Failed to list all nodes while filtering expendable pods: %v", err)
@@ -55,10 +54,10 @@ func (p *filterOutExpendable) Process(context *context.AutoscalingContext, pods 
 // addPreemptingPodsToSnapshot modifies the snapshot simulating scheduling of pods waiting for preemption.
 // this is not strictly correct as we are not simulating preemption itself but it matches
 // CA logic from before migration to scheduler framework. So let's keep it for now
-func (p *filterOutExpendable) addPreemptingPodsToSnapshot(pods []*apiv1.Pod, ctx *context.AutoscalingContext) error {
+func (p *filterOutExpendable) addPreemptingPodsToSnapshot(pods []*clustersnapshot.PodResourceInfo, ctx *context.AutoscalingContext) error {
 	for _, p := range pods {
-		if err := ctx.ClusterSnapshot.AddPod(clustersnapshot.NewPodResourceInfo(p, ctx.ClusterSnapshot.DraObjectsSource), p.Status.NominatedNodeName); err != nil {
-			klog.Errorf("Failed to update snapshot with pod %s/%s waiting for preemption: %v", p.Namespace, p.Name, err)
+		if err := ctx.ClusterSnapshot.AddPod(p, p.Pod.Status.NominatedNodeName); err != nil {
+			klog.Errorf("Failed to update snapshot with pod %s/%s waiting for preemption: %v", p.Pod.Namespace, p.Pod.Name, err)
 			return caerrors.ToAutoscalerError(caerrors.InternalError, err)
 		}
 	}

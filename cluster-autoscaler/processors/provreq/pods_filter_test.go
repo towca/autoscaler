@@ -22,48 +22,47 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-	apiv1 "k8s.io/api/core/v1"
-	corev1 "k8s.io/api/core/v1"
-	"k8s.io/autoscaler/cluster-autoscaler/apis/provisioningrequest/autoscaling.x-k8s.io/v1"
+	"k8s.io/autoscaler/cluster-autoscaler/apis/provisioningrequest/autoscaling.x-k8s.io/v1beta1"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 	"k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/pods"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	. "k8s.io/autoscaler/cluster-autoscaler/utils/test"
 	"k8s.io/client-go/tools/record"
 )
 
 func TestProvisioningRequestPodsFilter(t *testing.T) {
-	prPod1 := BuildTestPod("pr-pod-1", 500, 10)
-	prPod1.Annotations[v1.ProvisioningRequestPodAnnotationKey] = "pr-class"
+	prPod1 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("pr-pod-1", 500, 10)}
+	prPod1.Pod.Annotations[v1beta1.ProvisioningRequestPodAnnotationKey] = "pr-class"
 
-	prPod2 := BuildTestPod("pr-pod-2", 500, 10)
-	prPod2.Annotations[pods.DeprecatedProvisioningRequestPodAnnotationKey] = "pr-class-2"
+	prPod2 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("pr-pod-2", 500, 10)}
+	prPod2.Pod.Annotations[pods.DeprecatedProvisioningRequestPodAnnotationKey] = "pr-class-2"
 
-	pod1 := BuildTestPod("pod-1", 500, 10)
-	pod2 := BuildTestPod("pod-2", 500, 10)
+	pod1 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("pod-1", 500, 10)}
+	pod2 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("pod-2", 500, 10)}
 
 	testCases := map[string]struct {
-		unschedulableCandidates []*apiv1.Pod
-		expectedUnscheduledPods []*apiv1.Pod
+		unschedulableCandidates []*clustersnapshot.PodResourceInfo
+		expectedUnscheduledPods []*clustersnapshot.PodResourceInfo
 	}{
 		"ProvisioningRequest consumer is filtered out": {
-			unschedulableCandidates: []*corev1.Pod{prPod1, pod1},
-			expectedUnscheduledPods: []*corev1.Pod{pod1},
+			unschedulableCandidates: []*clustersnapshot.PodResourceInfo{prPod1, pod1},
+			expectedUnscheduledPods: []*clustersnapshot.PodResourceInfo{pod1},
 		},
 		"Different ProvisioningRequest consumers are filtered out": {
-			unschedulableCandidates: []*corev1.Pod{prPod1, prPod2, pod1},
-			expectedUnscheduledPods: []*corev1.Pod{pod1},
+			unschedulableCandidates: []*clustersnapshot.PodResourceInfo{prPod1, prPod2, pod1},
+			expectedUnscheduledPods: []*clustersnapshot.PodResourceInfo{pod1},
 		},
 		"No pod is filtered": {
-			unschedulableCandidates: []*corev1.Pod{pod1, pod2},
-			expectedUnscheduledPods: []*corev1.Pod{pod1, pod2},
+			unschedulableCandidates: []*clustersnapshot.PodResourceInfo{pod1, pod2},
+			expectedUnscheduledPods: []*clustersnapshot.PodResourceInfo{pod1, pod2},
 		},
 		"Empty unschedulable pods list": {
-			unschedulableCandidates: []*corev1.Pod{},
-			expectedUnscheduledPods: []*corev1.Pod{},
+			unschedulableCandidates: []*clustersnapshot.PodResourceInfo{},
+			expectedUnscheduledPods: []*clustersnapshot.PodResourceInfo{},
 		},
 		"All ProvisioningRequest consumers are filtered out": {
-			unschedulableCandidates: []*corev1.Pod{prPod1, prPod2},
-			expectedUnscheduledPods: []*corev1.Pod{},
+			unschedulableCandidates: []*clustersnapshot.PodResourceInfo{prPod1, prPod2},
+			expectedUnscheduledPods: []*clustersnapshot.PodResourceInfo{},
 		},
 	}
 	for _, test := range testCases {
@@ -89,11 +88,11 @@ func TestEventManager(t *testing.T) {
 	prFilter := NewProvisioningRequestPodsFilter(eventManager)
 	eventRecorder := record.NewFakeRecorder(10)
 	ctx := &context.AutoscalingContext{AutoscalingKubeClients: context.AutoscalingKubeClients{Recorder: eventRecorder}}
-	unscheduledPods := []*corev1.Pod{BuildTestPod("pod", 500, 10)}
+	unscheduledPods := []*clustersnapshot.PodResourceInfo{{Pod: BuildTestPod("pod", 500, 10)}}
 
 	for i := 0; i < 10; i++ {
-		prPod := BuildTestPod(fmt.Sprintf("pr-pod-%d", i), 10, 10)
-		prPod.Annotations[v1.ProvisioningRequestPodAnnotationKey] = "pr-class"
+		prPod := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod(fmt.Sprintf("pr-pod-%d", i), 10, 10)}
+		prPod.Pod.Annotations[v1beta1.ProvisioningRequestPodAnnotationKey] = "pr-class"
 		unscheduledPods = append(unscheduledPods, prPod)
 	}
 	got, err := prFilter.Process(ctx, unscheduledPods)

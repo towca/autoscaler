@@ -17,8 +17,8 @@ limitations under the License.
 package podlistprocessor
 
 import (
-	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	pod_util "k8s.io/autoscaler/cluster-autoscaler/utils/pod"
 	"k8s.io/klog/v2"
 )
@@ -33,16 +33,18 @@ func NewCurrentlyDrainedNodesPodListProcessor() *currentlyDrainedNodesPodListPro
 }
 
 // Process adds recreatable pods from currently drained nodes
-func (p *currentlyDrainedNodesPodListProcessor) Process(context *context.AutoscalingContext, unschedulablePods []*apiv1.Pod) ([]*apiv1.Pod, error) {
-	recreatablePods := pod_util.FilterRecreatablePods(currentlyDrainedPods(context))
-	return append(unschedulablePods, pod_util.ClearPodNodeNames(recreatablePods)...), nil
+func (p *currentlyDrainedNodesPodListProcessor) Process(context *context.AutoscalingContext, unschedulablePods []*clustersnapshot.PodResourceInfo) ([]*clustersnapshot.PodResourceInfo, error) {
+	drainedPods := currentlyDrainedPods(context)
+	recreatableDrainedPods := clustersnapshot.FilterByPod(drainedPods, pod_util.IsRecreatablePod)
+	clearedRecreatableDrainedPods := clustersnapshot.ApplyToPods(recreatableDrainedPods, pod_util.ClearPodName)
+	return append(unschedulablePods, clearedRecreatableDrainedPods...), nil
 }
 
 func (p *currentlyDrainedNodesPodListProcessor) CleanUp() {
 }
 
-func currentlyDrainedPods(context *context.AutoscalingContext) []*apiv1.Pod {
-	var pods []*apiv1.Pod
+func currentlyDrainedPods(context *context.AutoscalingContext) []*clustersnapshot.PodResourceInfo {
+	var pods []*clustersnapshot.PodResourceInfo
 	_, nodeNames := context.ScaleDownActuator.CheckStatus().DeletionsInProgress()
 	for _, nodeName := range nodeNames {
 		nodeInfo, err := context.ClusterSnapshot.NodeInfos().Get(nodeName)
@@ -56,7 +58,7 @@ func currentlyDrainedPods(context *context.AutoscalingContext) []*apiv1.Pod {
 				klog.Infof("Pod %v has deletion timestamp set, skipping injection to unschedulable pods list", podInfo.Pod.Name)
 				continue
 			}
-			pods = append(pods, podInfo.Pod)
+			pods = append(pods, &clustersnapshot.PodResourceInfo{Pod: podInfo.Pod, DynamicResourceRequests: podInfo.DynamicResourceRequests})
 		}
 	}
 	return pods

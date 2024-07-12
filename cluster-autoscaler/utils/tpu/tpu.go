@@ -20,6 +20,7 @@ import (
 	"strings"
 
 	apiv1 "k8s.io/api/core/v1"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 )
 
 const (
@@ -54,11 +55,14 @@ func clearTPURequest(pod *apiv1.Pod) *apiv1.Pod {
 
 // ClearTPURequests clears TPU requests for pods, so they don't interfere with scheduling
 // simulations. This isn't yet zone-aware.
-func ClearTPURequests(pods []*apiv1.Pod) []*apiv1.Pod {
-	podsWithTPU := make(map[int]*apiv1.Pod)
+func ClearTPURequests(pods []*clustersnapshot.PodResourceInfo) []*clustersnapshot.PodResourceInfo {
+	podsWithTPU := make(map[int]*clustersnapshot.PodResourceInfo)
 	for i, pod := range pods {
-		if hasTPURequest(pod) {
-			podsWithTPU[i] = clearTPURequest(pod)
+		if hasTPURequest(pod.Pod) {
+			podsWithTPU[i] = &clustersnapshot.PodResourceInfo{
+				Pod:                     clearTPURequest(pod.Pod),
+				DynamicResourceRequests: pod.DynamicResourceRequests,
+			}
 		}
 	}
 
@@ -67,7 +71,7 @@ func ClearTPURequests(pods []*apiv1.Pod) []*apiv1.Pod {
 	}
 
 	// Copy slice only if we need to replace some pods.
-	sanitizedPods := make([]*apiv1.Pod, len(pods))
+	sanitizedPods := make([]*clustersnapshot.PodResourceInfo, len(pods))
 	for i, pod := range pods {
 		if sanitized, found := podsWithTPU[i]; found {
 			sanitizedPods[i] = sanitized

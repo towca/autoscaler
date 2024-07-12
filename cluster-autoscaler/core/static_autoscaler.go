@@ -135,22 +135,22 @@ func (callbacks *staticAutoscalerProcessorCallbacks) reset() {
 
 // NewStaticAutoscaler creates an instance of Autoscaler filled with provided parameters
 func NewStaticAutoscaler(
-	opts config.AutoscalingOptions,
-	predicateChecker predicatechecker.PredicateChecker,
-	clusterSnapshot clustersnapshot.ClusterSnapshot,
-	autoscalingKubeClients *context.AutoscalingKubeClients,
-	processors *ca_processors.AutoscalingProcessors,
-	loopStartNotifier *loopstart.ObserversList,
-	cloudProvider cloudprovider.CloudProvider,
-	expanderStrategy expander.Strategy,
-	estimatorBuilder estimator.EstimatorBuilder,
-	backoff backoff.Backoff,
-	debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter,
-	remainingPdbTracker pdb.RemainingPdbTracker,
-	scaleUpOrchestrator scaleup.Orchestrator,
-	deleteOptions options.NodeDeleteOptions,
-	drainabilityRules rules.Rules,
-	draProvider *dynamicresources.Provider) *StaticAutoscaler {
+		opts config.AutoscalingOptions,
+		predicateChecker predicatechecker.PredicateChecker,
+		clusterSnapshot clustersnapshot.ClusterSnapshot,
+		autoscalingKubeClients *context.AutoscalingKubeClients,
+		processors *ca_processors.AutoscalingProcessors,
+		loopStartNotifier *loopstart.ObserversList,
+		cloudProvider cloudprovider.CloudProvider,
+		expanderStrategy expander.Strategy,
+		estimatorBuilder estimator.EstimatorBuilder,
+		backoff backoff.Backoff,
+		debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter,
+		remainingPdbTracker pdb.RemainingPdbTracker,
+		scaleUpOrchestrator scaleup.Orchestrator,
+		deleteOptions options.NodeDeleteOptions,
+		drainabilityRules rules.Rules,
+		draProvider *dynamicresources.Provider) *StaticAutoscaler {
 
 	clusterStateConfig := clusterstate.ClusterStateRegistryConfig{
 		MaxTotalUnreadyPercentage: opts.MaxTotalUnreadyPercentage,
@@ -533,7 +533,13 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 		a.AutoscalingContext.DebuggingSnapshotter.SetClusterNodes(l)
 	}
 
-	unschedulablePodsToHelp, err := a.processors.PodListProcessor.Process(a.AutoscalingContext, unschedulablePods)
+	// Attach DRA objects to the unschedulable pods. From this point on, unschedulable pods should be processed together with their DRA objects.
+	// This allows e.g. PodListProcessors that duplicate unschedulable pods to duplicate the DRA objects as well.
+	var unschedulablePodsDra []*clustersnapshot.PodResourceInfo
+	for _, pod := range unschedulablePods {
+		unschedulablePodsDra = append(unschedulablePodsDra, clustersnapshot.NewPodResourceInfo(pod, a.ClusterSnapshot.DraObjectsSource))
+	}
+	unschedulablePodsToHelp, err := a.processors.PodListProcessor.Process(a.AutoscalingContext, unschedulablePodsDra)
 
 	if err != nil {
 		klog.Warningf("Failed to process unschedulable pods: %v", err)
@@ -574,7 +580,7 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 	} else if a.MaxNodesTotal > 0 && len(readyNodes) >= a.MaxNodesTotal {
 		scaleUpStatus.Result = status.ScaleUpNoOptionsAvailable
 		klog.V(1).Info("Max total nodes in cluster reached")
-	} else if !isSchedulerProcessingIgnored && allPodsAreNew(unschedulablePodsToHelp, currentTime) {
+	} else if !isSchedulerProcessingIgnored && allPodsAreNew(clustersnapshot.ToPods(unschedulablePodsToHelp), currentTime) {
 		// The assumption here is that these pods have been created very recently and probably there
 		// is more pods to come. In theory we could check the newest pod time but then if pod were created
 		// slowly but at the pace of 1 every 2 seconds then no scale up would be triggered for long time.
@@ -584,7 +590,8 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 		klog.V(1).Info("Unschedulable pods are very new, waiting one iteration for more")
 	} else {
 		scaleUpStart := preScaleUp()
-		scaleUpStatus, typedErr = a.scaleUpOrchestrator.ScaleUp(unschedulablePodsToHelp, readyNodes, daemonsets, nodeInfosForGroups, false)
+		// TODO(DRA): Stop casting to naked Pods after ScaleUp works on PodResourceInfos.
+		scaleUpStatus, typedErr = a.scaleUpOrchestrator.ScaleUp(clustersnapshot.ToPods(unschedulablePodsToHelp), readyNodes, daemonsets, nodeInfosForGroups, false)
 		if exit, err := postScaleUp(scaleUpStart); exit {
 			return err
 		}
@@ -637,7 +644,7 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 
 		scaleDownInCooldown := a.isScaleDownInCooldown(currentTime, scaleDownCandidates)
 		klog.V(4).Infof("Scale down status: lastScaleUpTime=%s lastScaleDownDeleteTime=%v "+
-			"lastScaleDownFailTime=%s scaleDownForbidden=%v scaleDownInCooldown=%v",
+				"lastScaleDownFailTime=%s scaleDownForbidden=%v scaleDownInCooldown=%v",
 			a.lastScaleUpTime, a.lastScaleDownDeleteTime, a.lastScaleDownFailTime,
 			a.processorCallbacks.disableScaleDownForLoop, scaleDownInCooldown)
 		metrics.UpdateScaleDownInCooldown(scaleDownInCooldown)
@@ -676,8 +683,8 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 			}
 
 			if (scaleDownStatus.Result == scaledownstatus.ScaleDownNoNodeDeleted ||
-				scaleDownStatus.Result == scaledownstatus.ScaleDownNoUnneeded) &&
-				a.AutoscalingContext.AutoscalingOptions.MaxBulkSoftTaintCount != 0 {
+					scaleDownStatus.Result == scaledownstatus.ScaleDownNoUnneeded) &&
+					a.AutoscalingContext.AutoscalingOptions.MaxBulkSoftTaintCount != 0 {
 				taintableNodes := a.scaleDownPlanner.UnneededNodes()
 
 				// Make sure we are only cleaning taints from selected node groups.
@@ -743,9 +750,9 @@ func (a *StaticAutoscaler) isScaleDownInCooldown(currentTime time.Time, scaleDow
 		return scaleDownInCooldown
 	}
 	return scaleDownInCooldown ||
-		a.lastScaleUpTime.Add(a.ScaleDownDelayAfterAdd).After(currentTime) ||
-		a.lastScaleDownFailTime.Add(a.ScaleDownDelayAfterFailure).After(currentTime) ||
-		a.lastScaleDownDeleteTime.Add(a.ScaleDownDelayAfterDelete).After(currentTime)
+			a.lastScaleUpTime.Add(a.ScaleDownDelayAfterAdd).After(currentTime) ||
+			a.lastScaleDownFailTime.Add(a.ScaleDownDelayAfterFailure).After(currentTime) ||
+			a.lastScaleDownDeleteTime.Add(a.ScaleDownDelayAfterDelete).After(currentTime)
 }
 
 // Sets the target size of node groups to the current number of nodes in them
@@ -781,7 +788,7 @@ func fixNodeGroupSize(context *context.AutoscalingContext, clusterStateRegistry 
 
 // Removes unregistered nodes if needed. Returns true if anything was removed and error if such occurred.
 func (a *StaticAutoscaler) removeOldUnregisteredNodes(allUnregisteredNodes []clusterstate.UnregisteredNode, context *context.AutoscalingContext,
-	csr *clusterstate.ClusterStateRegistry, currentTime time.Time, logRecorder *utils.LogEventRecorder) (bool, error) {
+		csr *clusterstate.ClusterStateRegistry, currentTime time.Time, logRecorder *utils.LogEventRecorder) (bool, error) {
 
 	nodeGroups := a.nodeGroupsById()
 	nodesToDeleteByNodeGroupId := make(map[string][]clusterstate.UnregisteredNode)
@@ -936,20 +943,20 @@ func (a *StaticAutoscaler) nodeGroupsById() map[string]cloudprovider.NodeGroup {
 
 // Don't consider pods newer than newPodScaleUpDelay or annotated podScaleUpDelay
 // seconds old as unschedulable.
-func (a *StaticAutoscaler) filterOutYoungPods(allUnschedulablePods []*apiv1.Pod, currentTime time.Time) []*apiv1.Pod {
-	var oldUnschedulablePods []*apiv1.Pod
+func (a *StaticAutoscaler) filterOutYoungPods(allUnschedulablePods []*clustersnapshot.PodResourceInfo, currentTime time.Time) []*clustersnapshot.PodResourceInfo {
+	var oldUnschedulablePods []*clustersnapshot.PodResourceInfo
 	newPodScaleUpDelay := a.AutoscalingOptions.NewPodScaleUpDelay
 	for _, pod := range allUnschedulablePods {
-		podAge := currentTime.Sub(pod.CreationTimestamp.Time)
+		podAge := currentTime.Sub(pod.Pod.CreationTimestamp.Time)
 		podScaleUpDelay := newPodScaleUpDelay
 
-		if podScaleUpDelayAnnotationStr, ok := pod.Annotations[podScaleUpDelayAnnotationKey]; ok {
+		if podScaleUpDelayAnnotationStr, ok := pod.Pod.Annotations[podScaleUpDelayAnnotationKey]; ok {
 			podScaleUpDelayAnnotation, err := time.ParseDuration(podScaleUpDelayAnnotationStr)
 			if err != nil {
-				klog.Errorf("Failed to parse pod %q annotation %s: %v", pod.Name, podScaleUpDelayAnnotationKey, err)
+				klog.Errorf("Failed to parse pod %q annotation %s: %v", pod.Pod.Name, podScaleUpDelayAnnotationKey, err)
 			} else {
 				if podScaleUpDelayAnnotation < podScaleUpDelay {
-					klog.Errorf("Failed to set pod scale up delay for %q through annotation %s: %d is less then %d", pod.Name, podScaleUpDelayAnnotationKey, podScaleUpDelayAnnotation, newPodScaleUpDelay)
+					klog.Errorf("Failed to set pod scale up delay for %q through annotation %s: %d is less then %d", pod.Pod.Name, podScaleUpDelayAnnotationKey, podScaleUpDelayAnnotation, newPodScaleUpDelay)
 				} else {
 					podScaleUpDelay = podScaleUpDelayAnnotation
 				}
@@ -959,7 +966,7 @@ func (a *StaticAutoscaler) filterOutYoungPods(allUnschedulablePods []*apiv1.Pod,
 		if podAge > podScaleUpDelay {
 			oldUnschedulablePods = append(oldUnschedulablePods, pod)
 		} else {
-			klog.V(3).Infof("Pod %s is %.3f seconds old, too new to consider unschedulable", pod.Name, podAge.Seconds())
+			klog.V(3).Infof("Pod %s is %.3f seconds old, too new to consider unschedulable", pod.Pod.Name, podAge.Seconds())
 		}
 	}
 	return oldUnschedulablePods

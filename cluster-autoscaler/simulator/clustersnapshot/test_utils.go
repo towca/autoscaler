@@ -25,31 +25,37 @@ import (
 
 // InitializeClusterSnapshotOrDie clears cluster snapshot and then initializes it with given set of nodes and pods.
 // Both Spec.NodeName and Status.NominatedNodeName are used when simulating scheduling pods.
-func InitializeClusterSnapshotOrDie(
-	// TODO(DRA): Evaluate whether we need to update the tests calling this with something DRA-related, or maybe provide
-	// an equivalent function for tests that need to simulate DRA.
-	t *testing.T,
-	snapshot ClusterSnapshot,
-	nodes []*apiv1.Node,
-	pods []*apiv1.Pod) {
+func InitializeClusterSnapshotOrDie(t *testing.T, snapshot ClusterSnapshot, nodes []*apiv1.Node, pods []*apiv1.Pod) {
+	var nodeRes []*NodeResourceInfo
+	for _, node := range nodes {
+		nodeRes = append(nodeRes, &NodeResourceInfo{Node: node})
+	}
+	var podRes []*PodResourceInfo
+	for _, pod := range pods {
+		podRes = append(podRes, &PodResourceInfo{Pod: pod})
+	}
+	InitializeClusterSnapshotWithDynamicResourcesOrDie(t, snapshot, nodeRes, podRes)
+}
+
+func InitializeClusterSnapshotWithDynamicResourcesOrDie(t *testing.T, snapshot ClusterSnapshot, nodes []*NodeResourceInfo, pods []*PodResourceInfo) {
 	var err error
 
 	snapshot.Clear()
 
 	for _, node := range nodes {
-		err = snapshot.AddNode(&NodeResourceInfo{Node: node})
-		assert.NoError(t, err, "error while adding node %s", node.Name)
+		err = snapshot.AddNode(node)
+		assert.NoError(t, err, "error while adding node %s", node.Node.Name)
 	}
 
 	for _, pod := range pods {
-		if pod.Spec.NodeName != "" {
-			err = snapshot.AddPod(&PodResourceInfo{Pod: pod}, pod.Spec.NodeName)
-			assert.NoError(t, err, "error while adding pod %s/%s to node %s", pod.Namespace, pod.Name, pod.Spec.NodeName)
-		} else if pod.Status.NominatedNodeName != "" {
-			err = snapshot.AddPod(&PodResourceInfo{Pod: pod}, pod.Status.NominatedNodeName)
-			assert.NoError(t, err, "error while adding pod %s/%s to nominated node %s", pod.Namespace, pod.Name, pod.Status.NominatedNodeName)
+		if pod.Pod.Spec.NodeName != "" {
+			err = snapshot.AddPod(pod, pod.Pod.Spec.NodeName)
+			assert.NoError(t, err, "error while adding pod %s/%s to node %s", pod.Pod.Namespace, pod.Pod.Name, pod.Pod.Spec.NodeName)
+		} else if pod.Pod.Status.NominatedNodeName != "" {
+			err = snapshot.AddPod(pod, pod.Pod.Status.NominatedNodeName)
+			assert.NoError(t, err, "error while adding pod %s/%s to nominated node %s", pod.Pod.Namespace, pod.Pod.Name, pod.Pod.Status.NominatedNodeName)
 		} else {
-			assert.Fail(t, "pod %s/%s does not have Spec.NodeName nor Status.NominatedNodeName set", pod.Namespace, pod.Name)
+			assert.Fail(t, "pod %s/%s does not have Spec.NodeName nor Status.NominatedNodeName set", pod.Pod.Namespace, pod.Pod.Name)
 		}
 	}
 }

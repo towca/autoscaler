@@ -20,7 +20,6 @@ import (
 	"sort"
 	"time"
 
-	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 	"k8s.io/autoscaler/cluster-autoscaler/metrics"
@@ -46,7 +45,7 @@ func NewFilterOutSchedulablePodListProcessor(predicateChecker predicatechecker.P
 }
 
 // Process filters out pods which are schedulable from list of unschedulable pods.
-func (p *filterOutSchedulablePodListProcessor) Process(context *context.AutoscalingContext, unschedulablePods []*apiv1.Pod) ([]*apiv1.Pod, error) {
+func (p *filterOutSchedulablePodListProcessor) Process(context *context.AutoscalingContext, unschedulablePods []*clustersnapshot.PodResourceInfo) ([]*clustersnapshot.PodResourceInfo, error) {
 	// We need to check whether pods marked as unschedulable are actually unschedulable.
 	// It's likely we added a new node and the scheduler just haven't managed to put the
 	// pod on in yet. In this situation we don't want to trigger another scale-up.
@@ -79,7 +78,7 @@ func (p *filterOutSchedulablePodListProcessor) Process(context *context.Autoscal
 
 		if context.DebuggingSnapshotter.IsDataCollectionAllowed() {
 			schedulablePods := findSchedulablePods(unschedulablePods, unschedulablePodsToHelp)
-			context.DebuggingSnapshotter.SetUnscheduledPodsCanBeScheduled(schedulablePods)
+			context.DebuggingSnapshotter.SetUnscheduledPodsCanBeScheduled(clustersnapshot.ToPods(schedulablePods))
 		}
 
 	} else {
@@ -95,13 +94,14 @@ func (p *filterOutSchedulablePodListProcessor) CleanUp() {
 // unschedulable can be scheduled on free capacity on existing nodes by trying to pack the pods. It
 // tries to pack the higher priority pods first. It takes into account pods that are bound to node
 // and will be scheduled after lower priority pod preemption.
-func (p *filterOutSchedulablePodListProcessor) filterOutSchedulableByPacking(unschedulableCandidates []*apiv1.Pod, clusterSnapshot *clustersnapshot.Handle) ([]*apiv1.Pod, error) {
+func (p *filterOutSchedulablePodListProcessor) filterOutSchedulableByPacking(unschedulableCandidates []*clustersnapshot.PodResourceInfo, clusterSnapshot *clustersnapshot.Handle) ([]*clustersnapshot.PodResourceInfo, error) {
 	// Sort unschedulable pods by importance
 	sort.Slice(unschedulableCandidates, func(i, j int) bool {
-		return corev1helpers.PodPriority(unschedulableCandidates[i]) > corev1helpers.PodPriority(unschedulableCandidates[j])
+		return corev1helpers.PodPriority(unschedulableCandidates[i].Pod) > corev1helpers.PodPriority(unschedulableCandidates[j].Pod)
 	})
 
-	statuses, overflowingControllerCount, err := p.schedulingSimulator.TrySchedulePods(clusterSnapshot, unschedulableCandidates, p.nodeFilter, false)
+	// TODO(DRA): Stop casting to naked Pods after ScaleUp works on PodResourceInfos.
+	statuses, overflowingControllerCount, err := p.schedulingSimulator.TrySchedulePods(clusterSnapshot, clustersnapshot.ToPods(unschedulableCandidates), p.nodeFilter, false)
 	if err != nil {
 		return nil, err
 	}
@@ -112,9 +112,9 @@ func (p *filterOutSchedulablePodListProcessor) filterOutSchedulableByPacking(uns
 	}
 
 	// Pods that remain unschedulable
-	var unschedulablePods []*apiv1.Pod
+	var unschedulablePods []*clustersnapshot.PodResourceInfo
 	for _, pod := range unschedulableCandidates {
-		if !scheduledPods[pod.UID] {
+		if !scheduledPods[pod.Pod.UID] {
 			unschedulablePods = append(unschedulablePods, pod)
 		}
 	}
@@ -126,12 +126,12 @@ func (p *filterOutSchedulablePodListProcessor) filterOutSchedulableByPacking(uns
 	return unschedulablePods, nil
 }
 
-func findSchedulablePods(allUnschedulablePods, podsStillUnschedulable []*apiv1.Pod) []*apiv1.Pod {
-	podsStillUnschedulableMap := make(map[*apiv1.Pod]struct{}, len(podsStillUnschedulable))
+func findSchedulablePods(allUnschedulablePods, podsStillUnschedulable []*clustersnapshot.PodResourceInfo) []*clustersnapshot.PodResourceInfo {
+	podsStillUnschedulableMap := make(map[*clustersnapshot.PodResourceInfo]struct{}, len(podsStillUnschedulable))
 	for _, x := range podsStillUnschedulable {
 		podsStillUnschedulableMap[x] = struct{}{}
 	}
-	var schedulablePods []*apiv1.Pod
+	var schedulablePods []*clustersnapshot.PodResourceInfo
 	for _, x := range allUnschedulablePods {
 		if _, found := podsStillUnschedulableMap[x]; !found {
 			schedulablePods = append(schedulablePods, x)

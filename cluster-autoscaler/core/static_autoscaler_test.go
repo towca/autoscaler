@@ -2376,21 +2376,21 @@ func TestFilterOutYoungPods(t *testing.T) {
 	klog.InitFlags(nil)
 	flag.CommandLine.Parse([]string{"--logtostderr=false"})
 
-	p1 := BuildTestPod("p1", 500, 1000)
-	p1.CreationTimestamp = metav1.NewTime(now.Add(-1 * time.Minute))
-	p2 := BuildTestPod("p2", 500, 1000)
-	p2.CreationTimestamp = metav1.NewTime(now.Add(-1 * time.Minute))
-	p2.Annotations = map[string]string{
+	p1 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p1", 500, 1000)}
+	p1.Pod.CreationTimestamp = metav1.NewTime(now.Add(-1 * time.Minute))
+	p2 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p2", 500, 1000)}
+	p2.Pod.CreationTimestamp = metav1.NewTime(now.Add(-1 * time.Minute))
+	p2.Pod.Annotations = map[string]string{
 		podScaleUpDelayAnnotationKey: "5m",
 	}
-	p3 := BuildTestPod("p3", 500, 1000)
-	p3.CreationTimestamp = metav1.NewTime(now.Add(-1 * time.Minute))
-	p3.Annotations = map[string]string{
+	p3 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p3", 500, 1000)}
+	p3.Pod.CreationTimestamp = metav1.NewTime(now.Add(-1 * time.Minute))
+	p3.Pod.Annotations = map[string]string{
 		podScaleUpDelayAnnotationKey: "2m",
 	}
-	p4 := BuildTestPod("p4", 500, 1000)
-	p4.CreationTimestamp = metav1.NewTime(now.Add(-1 * time.Minute))
-	p4.Annotations = map[string]string{
+	p4 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p4", 500, 1000)}
+	p4.Pod.CreationTimestamp = metav1.NewTime(now.Add(-1 * time.Minute))
+	p4.Pod.Annotations = map[string]string{
 		podScaleUpDelayAnnotationKey: "error",
 	}
 
@@ -2398,45 +2398,45 @@ func TestFilterOutYoungPods(t *testing.T) {
 		name               string
 		newPodScaleUpDelay time.Duration
 		runTime            time.Time
-		pods               []*apiv1.Pod
-		expectedPods       []*apiv1.Pod
+		pods               []*clustersnapshot.PodResourceInfo
+		expectedPods       []*clustersnapshot.PodResourceInfo
 		expectedError      string
 	}{
 		{
 			name:               "annotation delayed pod checking now",
 			newPodScaleUpDelay: 0,
 			runTime:            now,
-			pods:               []*apiv1.Pod{p1, p2},
-			expectedPods:       []*apiv1.Pod{p1},
+			pods:               []*clustersnapshot.PodResourceInfo{p1, p2},
+			expectedPods:       []*clustersnapshot.PodResourceInfo{p1},
 		},
 		{
 			name:               "annotation delayed pod checking after delay",
 			newPodScaleUpDelay: 0,
 			runTime:            now.Add(5 * time.Minute),
-			pods:               []*apiv1.Pod{p1, p2},
-			expectedPods:       []*apiv1.Pod{p1, p2},
+			pods:               []*clustersnapshot.PodResourceInfo{p1, p2},
+			expectedPods:       []*clustersnapshot.PodResourceInfo{p1, p2},
 		},
 		{
 			name:               "globally delayed pods",
 			newPodScaleUpDelay: 5 * time.Minute,
 			runTime:            now,
-			pods:               []*apiv1.Pod{p1, p2},
-			expectedPods:       []*apiv1.Pod(nil),
+			pods:               []*clustersnapshot.PodResourceInfo{p1, p2},
+			expectedPods:       []*clustersnapshot.PodResourceInfo(nil),
 		},
 		{
 			name:               "annotation delay smaller than global",
 			newPodScaleUpDelay: 5 * time.Minute,
 			runTime:            now.Add(2 * time.Minute),
-			pods:               []*apiv1.Pod{p1, p3},
-			expectedPods:       []*apiv1.Pod(nil),
+			pods:               []*clustersnapshot.PodResourceInfo{p1, p3},
+			expectedPods:       []*clustersnapshot.PodResourceInfo(nil),
 			expectedError:      "Failed to set pod scale up delay for",
 		},
 		{
 			name:               "annotation delay with error",
 			newPodScaleUpDelay: 0,
 			runTime:            now,
-			pods:               []*apiv1.Pod{p1, p4},
-			expectedPods:       []*apiv1.Pod{p1, p4},
+			pods:               []*clustersnapshot.PodResourceInfo{p1, p4},
+			expectedPods:       []*clustersnapshot.PodResourceInfo{p1, p4},
 			expectedError:      "Failed to parse pod",
 		},
 	}

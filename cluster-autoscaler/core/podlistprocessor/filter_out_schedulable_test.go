@@ -36,135 +36,135 @@ func TestFilterOutSchedulable(t *testing.T) {
 	matchesNoNodes := func(*schedulerframework.NodeInfo) bool { return false }
 
 	testCases := map[string]struct {
-		nodesWithPods           map[*apiv1.Node][]*apiv1.Pod
-		unschedulableCandidates []*apiv1.Pod
-		expectedScheduledPods   []*apiv1.Pod
-		expectedUnscheduledPods []*apiv1.Pod
+		nodesWithPods           map[*clustersnapshot.NodeResourceInfo][]*clustersnapshot.PodResourceInfo
+		unschedulableCandidates []*clustersnapshot.PodResourceInfo
+		expectedScheduledPods   []*clustersnapshot.PodResourceInfo
+		expectedUnscheduledPods []*clustersnapshot.PodResourceInfo
 		nodeFilter              func(*schedulerframework.NodeInfo) bool
 	}{
 		"single empty node, no pods": {
-			nodesWithPods: map[*apiv1.Node][]*apiv1.Pod{node: {}},
+			nodesWithPods: map[*clustersnapshot.NodeResourceInfo][]*clustersnapshot.PodResourceInfo{node: {}},
 			nodeFilter:    matchesAllNodes,
 		},
 		"single empty node, single schedulable pod": {
-			nodesWithPods: map[*apiv1.Node][]*apiv1.Pod{node: {}},
-			unschedulableCandidates: []*apiv1.Pod{
-				BuildTestPod("pod", 500, 10),
+			nodesWithPods: map[*clustersnapshot.NodeResourceInfo][]*clustersnapshot.PodResourceInfo{node: {}},
+			unschedulableCandidates: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod", 500, 10)},
 			},
-			expectedScheduledPods: []*apiv1.Pod{
-				BuildTestPod("pod", 500, 10),
+			expectedScheduledPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod", 500, 10)},
 			},
 			nodeFilter: matchesAllNodes,
 		},
 		"single empty node, many schedulable pods": {
-			nodesWithPods: map[*apiv1.Node][]*apiv1.Pod{node: {}},
-			unschedulableCandidates: []*apiv1.Pod{
-				BuildTestPod("pod1", 200, 10),
-				BuildTestPod("pod2", 500, 10),
-				BuildTestPod("pod3", 800, 10),
+			nodesWithPods: map[*clustersnapshot.NodeResourceInfo][]*clustersnapshot.PodResourceInfo{node: {}},
+			unschedulableCandidates: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod1", 200, 10)},
+				{Pod: BuildTestPod("pod2", 500, 10)},
+				{Pod: BuildTestPod("pod3", 800, 10)},
 			},
-			expectedScheduledPods: []*apiv1.Pod{
-				BuildTestPod("pod1", 200, 10),
-				BuildTestPod("pod2", 500, 10),
-				BuildTestPod("pod3", 800, 10),
+			expectedScheduledPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod1", 200, 10)},
+				{Pod: BuildTestPod("pod2", 500, 10)},
+				{Pod: BuildTestPod("pod3", 800, 10)},
 			},
 			nodeFilter: matchesAllNodes,
 		},
 		"single empty node, single unschedulable pod": {
-			nodesWithPods: map[*apiv1.Node][]*apiv1.Pod{node: {}},
-			unschedulableCandidates: []*apiv1.Pod{
-				BuildTestPod("pod1", 3000, 10),
+			nodesWithPods: map[*clustersnapshot.NodeResourceInfo][]*clustersnapshot.PodResourceInfo{node: {}},
+			unschedulableCandidates: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod1", 3000, 10)},
 			},
-			expectedUnscheduledPods: []*apiv1.Pod{
-				BuildTestPod("pod1", 3000, 10),
+			expectedUnscheduledPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod1", 3000, 10)},
 			},
 			nodeFilter: matchesAllNodes,
 		},
 		"single empty node, various pods": {
-			nodesWithPods: map[*apiv1.Node][]*apiv1.Pod{node: {}},
-			unschedulableCandidates: []*apiv1.Pod{
-				BuildTestPod("pod1", 200, 10),
-				BuildTestPod("pod2", 500, 10),
-				BuildTestPod("pod3", 1800, 10),
+			nodesWithPods: map[*clustersnapshot.NodeResourceInfo][]*clustersnapshot.PodResourceInfo{node: {}},
+			unschedulableCandidates: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod1", 200, 10)},
+				{Pod: BuildTestPod("pod2", 500, 10)},
+				{Pod: BuildTestPod("pod3", 1800, 10)},
 			},
-			expectedScheduledPods: []*apiv1.Pod{
-				BuildTestPod("pod1", 200, 10),
-				BuildTestPod("pod2", 500, 10),
+			expectedScheduledPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod1", 200, 10)},
+				{Pod: BuildTestPod("pod2", 500, 10)},
 			},
-			expectedUnscheduledPods: []*apiv1.Pod{
-				BuildTestPod("pod3", 1800, 10),
+			expectedUnscheduledPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod3", 1800, 10)},
 			},
 			nodeFilter: matchesAllNodes,
 		},
 		"single empty node, some priority pods": {
-			nodesWithPods: map[*apiv1.Node][]*apiv1.Pod{node: {}},
-			unschedulableCandidates: []*apiv1.Pod{
-				BuildTestPod("pod1", 200, 10),
+			nodesWithPods: map[*clustersnapshot.NodeResourceInfo][]*clustersnapshot.PodResourceInfo{node: {}},
+			unschedulableCandidates: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod1", 200, 10)},
 				buildPriorityTestPod("pod2", 500, 10, 10),
 				buildPriorityTestPod("pod3", 1800, 10, 20),
 			},
-			expectedScheduledPods: []*apiv1.Pod{
+			expectedScheduledPods: []*clustersnapshot.PodResourceInfo{
 				buildPriorityTestPod("pod3", 1800, 10, 20),
-				BuildTestPod("pod1", 200, 10),
+				{Pod: BuildTestPod("pod1", 200, 10)},
 			},
-			expectedUnscheduledPods: []*apiv1.Pod{
+			expectedUnscheduledPods: []*clustersnapshot.PodResourceInfo{
 				buildPriorityTestPod("pod2", 500, 10, 10),
 			},
 			nodeFilter: matchesAllNodes,
 		},
 		"non-empty node with a single pods scheduled": {
-			nodesWithPods: map[*apiv1.Node][]*apiv1.Pod{
+			nodesWithPods: map[*clustersnapshot.NodeResourceInfo][]*clustersnapshot.PodResourceInfo{
 				node: {
-					BuildTestPod("pod1", 500, 10),
+					{Pod: BuildTestPod("pod1", 500, 10)},
 				},
 			},
-			unschedulableCandidates: []*apiv1.Pod{
-				BuildTestPod("pod2", 1000, 10),
-				BuildTestPod("pod3", 300, 10),
-				BuildTestPod("pod4", 300, 10),
+			unschedulableCandidates: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod2", 1000, 10)},
+				{Pod: BuildTestPod("pod3", 300, 10)},
+				{Pod: BuildTestPod("pod4", 300, 10)},
 			},
-			expectedScheduledPods: []*apiv1.Pod{
-				BuildTestPod("pod2", 1000, 10),
-				BuildTestPod("pod3", 300, 10),
+			expectedScheduledPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod2", 1000, 10)},
+				{Pod: BuildTestPod("pod3", 300, 10)},
 			},
-			expectedUnscheduledPods: []*apiv1.Pod{
-				BuildTestPod("pod4", 300, 10),
+			expectedUnscheduledPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod4", 300, 10)},
 			},
 			nodeFilter: matchesAllNodes,
 		},
 		"non-empty node with many pods scheduled": {
-			nodesWithPods: map[*apiv1.Node][]*apiv1.Pod{
+			nodesWithPods: map[*clustersnapshot.NodeResourceInfo][]*clustersnapshot.PodResourceInfo{
 				node: {
-					BuildTestPod("pod1", 500, 10),
-					BuildTestPod("pod2", 1000, 10),
+					{Pod: BuildTestPod("pod1", 500, 10)},
+					{Pod: BuildTestPod("pod2", 1000, 10)},
 				},
 			},
-			unschedulableCandidates: []*apiv1.Pod{
-				BuildTestPod("pod3", 1000, 10),
-				BuildTestPod("pod4", 300, 10),
-				BuildTestPod("pod5", 300, 10),
+			unschedulableCandidates: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod3", 1000, 10)},
+				{Pod: BuildTestPod("pod4", 300, 10)},
+				{Pod: BuildTestPod("pod5", 300, 10)},
 			},
-			expectedScheduledPods: []*apiv1.Pod{
-				BuildTestPod("pod4", 300, 10),
+			expectedScheduledPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod4", 300, 10)},
 			},
-			expectedUnscheduledPods: []*apiv1.Pod{
-				BuildTestPod("pod3", 1000, 10),
-				BuildTestPod("pod5", 300, 10),
+			expectedUnscheduledPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod3", 1000, 10)},
+				{Pod: BuildTestPod("pod5", 300, 10)},
 			},
 			nodeFilter: matchesAllNodes,
 		},
 		"single empty node, various pods, node should not be considered": {
-			nodesWithPods: map[*apiv1.Node][]*apiv1.Pod{node: {}},
-			unschedulableCandidates: []*apiv1.Pod{
-				BuildTestPod("pod1", 200, 10),
-				BuildTestPod("pod2", 500, 10),
-				BuildTestPod("pod3", 1800, 10),
+			nodesWithPods: map[*clustersnapshot.NodeResourceInfo][]*clustersnapshot.PodResourceInfo{node: {}},
+			unschedulableCandidates: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod1", 200, 10)},
+				{Pod: BuildTestPod("pod2", 500, 10)},
+				{Pod: BuildTestPod("pod3", 1800, 10)},
 			},
-			expectedScheduledPods: []*apiv1.Pod{},
-			expectedUnscheduledPods: []*apiv1.Pod{
-				BuildTestPod("pod1", 200, 10),
-				BuildTestPod("pod2", 500, 10),
-				BuildTestPod("pod3", 1800, 10),
+			expectedScheduledPods: []*clustersnapshot.PodResourceInfo{},
+			expectedUnscheduledPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("pod1", 200, 10)},
+				{Pod: BuildTestPod("pod2", 500, 10)},
+				{Pod: BuildTestPod("pod3", 1800, 10)},
 			},
 			nodeFilter: matchesNoNodes,
 		},
@@ -176,16 +176,16 @@ func TestFilterOutSchedulable(t *testing.T) {
 			predicateChecker, err := predicatechecker.NewTestPredicateChecker()
 			assert.NoError(t, err)
 
-			var allExpectedScheduledPods []*apiv1.Pod
+			var allExpectedScheduledPods []*clustersnapshot.PodResourceInfo
 			allExpectedScheduledPods = append(allExpectedScheduledPods, tc.expectedScheduledPods...)
 
 			for node, pods := range tc.nodesWithPods {
-				err := clusterSnapshot.AddNode(&clustersnapshot.NodeResourceInfo{Node: node})
+				err := clusterSnapshot.AddNode(node)
 				assert.NoError(t, err)
 
 				for _, pod := range pods {
-					pod.Spec.NodeName = node.Name
-					err = clusterSnapshot.AddPod(&clustersnapshot.PodResourceInfo{Pod: pod}, node.Name)
+					pod.Pod.Spec.NodeName = node.Node.Name
+					err = clusterSnapshot.AddPod(pod, node.Node.Name)
 					assert.NoError(t, err)
 
 					allExpectedScheduledPods = append(allExpectedScheduledPods, pod)
@@ -202,10 +202,10 @@ func TestFilterOutSchedulable(t *testing.T) {
 
 			nodeInfos, err := clusterSnapshot.NodeInfos().List()
 			assert.NoError(t, err)
-			var scheduledPods []*apiv1.Pod
+			var scheduledPods []*clustersnapshot.PodResourceInfo
 			for _, nodeInfo := range nodeInfos {
 				for _, podInfo := range nodeInfo.Pods {
-					scheduledPods = append(scheduledPods, podInfo.Pod)
+					scheduledPods = append(scheduledPods, &clustersnapshot.PodResourceInfo{Pod: podInfo.Pod, DynamicResourceRequests: podInfo.DynamicResourceRequests})
 				}
 			}
 			assert.ElementsMatch(t, scheduledPods, allExpectedScheduledPods, "scheduled pods differ")
@@ -259,9 +259,9 @@ func BenchmarkFilterOutSchedulable(b *testing.B) {
 	for snapshotName, snapshotFactory := range snapshots {
 		for _, tc := range tests {
 			b.Run(fmt.Sprintf("%s: %d nodes %d scheduled %d pending", snapshotName, tc.nodes, tc.scheduledPods, tc.pendingPods), func(b *testing.B) {
-				pendingPods := make([]*apiv1.Pod, tc.pendingPods, tc.pendingPods)
+				pendingPods := make([]*clustersnapshot.PodResourceInfo, tc.pendingPods, tc.pendingPods)
 				for i := 0; i < tc.pendingPods; i++ {
-					pendingPods[i] = BuildTestPod(fmt.Sprintf("p-%d", i), 1000, 2000000)
+					pendingPods[i] = &clustersnapshot.PodResourceInfo{Pod: BuildTestPod(fmt.Sprintf("p-%d", i), 1000, 2000000)}
 				}
 				nodes := make([]*clustersnapshot.NodeResourceInfo, tc.nodes, tc.nodes)
 				for i := 0; i < tc.nodes; i++ {
@@ -307,14 +307,14 @@ func BenchmarkFilterOutSchedulable(b *testing.B) {
 	}
 }
 
-func buildReadyTestNode(name string, cpu, mem int64) *apiv1.Node {
+func buildReadyTestNode(name string, cpu, mem int64) *clustersnapshot.NodeResourceInfo {
 	node := BuildTestNode(name, cpu, mem)
 	SetNodeReadyState(node, true, time.Time{})
-	return node
+	return &clustersnapshot.NodeResourceInfo{Node: node}
 }
 
-func buildPriorityTestPod(name string, cpu, mem int64, priority int32) *apiv1.Pod {
+func buildPriorityTestPod(name string, cpu, mem int64, priority int32) *clustersnapshot.PodResourceInfo {
 	pod := BuildTestPod(name, cpu, mem)
 	pod.Spec.Priority = &priority
-	return pod
+	return &clustersnapshot.PodResourceInfo{Pod: pod}
 }

@@ -26,6 +26,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/context"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/pods"
 	provreqpods "k8s.io/autoscaler/cluster-autoscaler/provisioningrequest/pods"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/klogx"
 )
 
@@ -69,20 +70,20 @@ type ProvisioningRequestPodsFilter struct {
 // Process filters out all pods that are consuming a Provisioning Request from unschedulable pods list.
 func (p *ProvisioningRequestPodsFilter) Process(
 	context *context.AutoscalingContext,
-	unschedulablePods []*apiv1.Pod,
-) ([]*apiv1.Pod, error) {
+	unschedulablePods []*clustersnapshot.PodResourceInfo,
+) ([]*clustersnapshot.PodResourceInfo, error) {
 	now := time.Now()
 	p.eventManager.Reset()
 	loggingQuota := klogx.PodsLoggingQuota()
-	result := make([]*apiv1.Pod, 0, len(unschedulablePods))
+	result := make([]*clustersnapshot.PodResourceInfo, 0, len(unschedulablePods))
 	for _, pod := range unschedulablePods {
-		prName, found := provisioningRequestName(pod)
+		prName, found := provisioningRequestName(pod.Pod)
 		if !found {
 			result = append(result, pod)
 			continue
 		}
-		klogx.V(1).UpTo(loggingQuota).Infof("Ignoring unschedulable pod %s/%s as it consumes ProvisioningRequest: %s/%s", pod.Namespace, pod.Name, pod.Namespace, prName)
-		p.eventManager.LogIgnoredInScaleUpEvent(context, now, pod, prName)
+		klogx.V(1).UpTo(loggingQuota).Infof("Ignoring unschedulable pod %s/%s as it consumes ProvisioningRequest: %s/%s", pod.Pod.Namespace, pod.Pod.Name, pod.Pod.Namespace, prName)
+		p.eventManager.LogIgnoredInScaleUpEvent(context, now, pod.Pod, prName)
 	}
 	klogx.V(1).Over(loggingQuota).Infof("There are also %v other pods which were ignored", -loggingQuota.Left())
 	return result, nil

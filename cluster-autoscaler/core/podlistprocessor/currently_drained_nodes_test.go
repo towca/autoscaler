@@ -34,231 +34,231 @@ func TestCurrentlyDrainedNodesPodListProcessor(t *testing.T) {
 	testCases := []struct {
 		name         string
 		drainedNodes []string
-		nodes        []*apiv1.Node
-		pods         []*apiv1.Pod
+		nodes        []*clustersnapshot.NodeResourceInfo
+		pods         []*clustersnapshot.PodResourceInfo
 
-		unschedulablePods []*apiv1.Pod
-		wantPods          []*apiv1.Pod
+		unschedulablePods []*clustersnapshot.PodResourceInfo
+		wantPods          []*clustersnapshot.PodResourceInfo
 	}{
 		{
 			name: "no nodes, no unschedulable pods",
 		},
 		{
 			name: "no nodes, some unschedulable pods",
-			unschedulablePods: []*apiv1.Pod{
-				BuildTestPod("p1", 100, 1),
-				BuildTestPod("p2", 200, 1),
+			unschedulablePods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p1", 100, 1)},
+				{Pod: BuildTestPod("p2", 200, 1)},
 			},
-			wantPods: []*apiv1.Pod{
-				BuildTestPod("p1", 100, 1),
-				BuildTestPod("p2", 200, 1),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p1", 100, 1)},
+				{Pod: BuildTestPod("p2", 200, 1)},
 			},
 		},
 		{
 			name:         "single node undergoing deletion",
 			drainedNodes: []string{"n"},
-			nodes: []*apiv1.Node{
-				BuildTestNode("n", 1000, 10),
+			nodes: []*clustersnapshot.NodeResourceInfo{
+				{Node: BuildTestNode("n", 1000, 10)},
 			},
-			pods: []*apiv1.Pod{
-				BuildScheduledTestPod("p1", 100, 1, "n"),
-				BuildScheduledTestPod("p2", 200, 1, "n"),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildScheduledTestPod("p1", 100, 1, "n")},
+				{Pod: BuildScheduledTestPod("p2", 200, 1, "n")},
 			},
-			wantPods: []*apiv1.Pod{
-				BuildTestPod("p1", 100, 1),
-				BuildTestPod("p2", 200, 1),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p1", 100, 1)},
+				{Pod: BuildTestPod("p2", 200, 1)},
 			},
 		},
 		{
 			name:         "single node undergoing deletion, pods with deletion timestamp set",
 			drainedNodes: []string{"n"},
-			nodes: []*apiv1.Node{
-				BuildTestNode("n", 1000, 10),
+			nodes: []*clustersnapshot.NodeResourceInfo{
+				{Node: BuildTestNode("n", 1000, 10)},
 			},
-			pods: []*apiv1.Pod{
-				BuildScheduledTestPod("p1", 100, 1, "n"),
-				BuildTestPod("p2", 200, 1, WithNodeName("n"), WithDeletionTimestamp(time.Now())),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildScheduledTestPod("p1", 100, 1, "n")},
+				{Pod: BuildTestPod("p2", 200, 1, WithNodeName("n"), WithDeletionTimestamp(time.Now()))},
 			},
-			wantPods: []*apiv1.Pod{
-				BuildTestPod("p1", 100, 1),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p1", 100, 1)},
 			},
 		},
 		{
 			name:         "single empty node undergoing deletion",
 			drainedNodes: []string{"n"},
-			nodes: []*apiv1.Node{
-				BuildTestNode("n", 1000, 10),
+			nodes: []*clustersnapshot.NodeResourceInfo{
+				{Node: BuildTestNode("n", 1000, 10)},
 			},
 		},
 		{
 			name:         "single node undergoing deletion, unschedulable pods",
 			drainedNodes: []string{"n"},
-			nodes: []*apiv1.Node{
-				BuildTestNode("n", 1000, 10),
+			nodes: []*clustersnapshot.NodeResourceInfo{
+				{Node: BuildTestNode("n", 1000, 10)},
 			},
-			pods: []*apiv1.Pod{
-				BuildScheduledTestPod("p1", 100, 1, "n"),
-				BuildScheduledTestPod("p2", 200, 1, "n"),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildScheduledTestPod("p1", 100, 1, "n")},
+				{Pod: BuildScheduledTestPod("p2", 200, 1, "n")},
 			},
-			unschedulablePods: []*apiv1.Pod{
-				BuildTestPod("p3", 300, 1),
-				BuildTestPod("p4", 400, 1),
+			unschedulablePods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p3", 300, 1)},
+				{Pod: BuildTestPod("p4", 400, 1)},
 			},
-			wantPods: []*apiv1.Pod{
-				BuildTestPod("p1", 100, 1),
-				BuildTestPod("p2", 200, 1),
-				BuildTestPod("p3", 300, 1),
-				BuildTestPod("p4", 400, 1),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p1", 100, 1)},
+				{Pod: BuildTestPod("p2", 200, 1)},
+				{Pod: BuildTestPod("p3", 300, 1)},
+				{Pod: BuildTestPod("p4", 400, 1)},
 			},
 		},
 		{
 			name: "single ready node",
-			nodes: []*apiv1.Node{
-				BuildTestNode("n", 1000, 10),
+			nodes: []*clustersnapshot.NodeResourceInfo{
+				{Node: BuildTestNode("n", 1000, 10)},
 			},
-			pods: []*apiv1.Pod{
-				BuildScheduledTestPod("p1", 100, 1, "n"),
-				BuildScheduledTestPod("p2", 200, 1, "n"),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildScheduledTestPod("p1", 100, 1, "n")},
+				{Pod: BuildScheduledTestPod("p2", 200, 1, "n")},
 			},
 		},
 		{
 			name: "single ready node, unschedulable pods",
-			nodes: []*apiv1.Node{
-				BuildTestNode("n", 1000, 10),
+			nodes: []*clustersnapshot.NodeResourceInfo{
+				{Node: BuildTestNode("n", 1000, 10)},
 			},
-			pods: []*apiv1.Pod{
-				BuildScheduledTestPod("p1", 100, 1, "n"),
-				BuildScheduledTestPod("p2", 200, 1, "n"),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildScheduledTestPod("p1", 100, 1, "n")},
+				{Pod: BuildScheduledTestPod("p2", 200, 1, "n")},
 			},
-			unschedulablePods: []*apiv1.Pod{
-				BuildTestPod("p3", 300, 1),
-				BuildTestPod("p4", 400, 1),
+			unschedulablePods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p3", 300, 1)},
+				{Pod: BuildTestPod("p4", 400, 1)},
 			},
-			wantPods: []*apiv1.Pod{
-				BuildTestPod("p3", 300, 1),
-				BuildTestPod("p4", 400, 1),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p3", 300, 1)},
+				{Pod: BuildTestPod("p4", 400, 1)},
 			},
 		},
 		{
 			name:         "multiple nodes, all undergoing deletion",
 			drainedNodes: []string{"n1", "n2"},
-			nodes: []*apiv1.Node{
-				BuildTestNode("n1", 1000, 10),
-				BuildTestNode("n2", 1000, 10),
+			nodes: []*clustersnapshot.NodeResourceInfo{
+				{Node: BuildTestNode("n1", 1000, 10)},
+				{Node: BuildTestNode("n2", 1000, 10)},
 			},
-			pods: []*apiv1.Pod{
-				BuildScheduledTestPod("p1", 100, 1, "n1"),
-				BuildScheduledTestPod("p2", 200, 1, "n1"),
-				BuildScheduledTestPod("p3", 300, 1, "n2"),
-				BuildScheduledTestPod("p4", 400, 1, "n2"),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildScheduledTestPod("p1", 100, 1, "n1")},
+				{Pod: BuildScheduledTestPod("p2", 200, 1, "n1")},
+				{Pod: BuildScheduledTestPod("p3", 300, 1, "n2")},
+				{Pod: BuildScheduledTestPod("p4", 400, 1, "n2")},
 			},
-			wantPods: []*apiv1.Pod{
-				BuildTestPod("p1", 100, 1),
-				BuildTestPod("p2", 200, 1),
-				BuildTestPod("p3", 300, 1),
-				BuildTestPod("p4", 400, 1),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p1", 100, 1)},
+				{Pod: BuildTestPod("p2", 200, 1)},
+				{Pod: BuildTestPod("p3", 300, 1)},
+				{Pod: BuildTestPod("p4", 400, 1)},
 			},
 		},
 		{
 			name:         "multiple nodes, some undergoing deletion",
 			drainedNodes: []string{"n1"},
-			nodes: []*apiv1.Node{
-				BuildTestNode("n1", 1000, 10),
-				BuildTestNode("n2", 1000, 10),
+			nodes: []*clustersnapshot.NodeResourceInfo{
+				{Node: BuildTestNode("n1", 1000, 10)},
+				{Node: BuildTestNode("n2", 1000, 10)},
 			},
-			pods: []*apiv1.Pod{
-				BuildScheduledTestPod("p1", 100, 1, "n1"),
-				BuildScheduledTestPod("p2", 200, 1, "n1"),
-				BuildScheduledTestPod("p3", 300, 1, "n2"),
-				BuildScheduledTestPod("p4", 400, 1, "n2"),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildScheduledTestPod("p1", 100, 1, "n1")},
+				{Pod: BuildScheduledTestPod("p2", 200, 1, "n1")},
+				{Pod: BuildScheduledTestPod("p3", 300, 1, "n2")},
+				{Pod: BuildScheduledTestPod("p4", 400, 1, "n2")},
 			},
-			wantPods: []*apiv1.Pod{
-				BuildTestPod("p1", 100, 1),
-				BuildTestPod("p2", 200, 1),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p1", 100, 1)},
+				{Pod: BuildTestPod("p2", 200, 1)},
 			},
 		},
 		{
 			name: "multiple nodes, no undergoing deletion",
-			nodes: []*apiv1.Node{
-				BuildTestNode("n1", 1000, 10),
-				BuildTestNode("n2", 1000, 10),
+			nodes: []*clustersnapshot.NodeResourceInfo{
+				{Node: BuildTestNode("n1", 1000, 10)},
+				{Node: BuildTestNode("n2", 1000, 10)},
 			},
-			pods: []*apiv1.Pod{
-				BuildScheduledTestPod("p1", 100, 1, "n1"),
-				BuildScheduledTestPod("p2", 200, 1, "n1"),
-				BuildScheduledTestPod("p3", 300, 1, "n2"),
-				BuildScheduledTestPod("p4", 400, 1, "n2"),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildScheduledTestPod("p1", 100, 1, "n1")},
+				{Pod: BuildScheduledTestPod("p2", 200, 1, "n1")},
+				{Pod: BuildScheduledTestPod("p3", 300, 1, "n2")},
+				{Pod: BuildScheduledTestPod("p4", 400, 1, "n2")},
 			},
 		},
 		{
 			name:         "single node, non-recreatable pods filtered out",
 			drainedNodes: []string{"n"},
-			nodes: []*apiv1.Node{
-				BuildTestNode("n", 1000, 10),
+			nodes: []*clustersnapshot.NodeResourceInfo{
+				{Node: BuildTestNode("n", 1000, 10)},
 			},
-			pods: []*apiv1.Pod{
-				BuildScheduledTestPod("p1", 100, 1, "n"),
-				SetRSPodSpec(BuildScheduledTestPod("p2", 200, 1, "n"), "rs"),
-				SetDSPodSpec(BuildScheduledTestPod("p3", 300, 1, "n")),
-				SetMirrorPodSpec(BuildScheduledTestPod("p4", 400, 1, "n")),
-				SetStaticPodSpec(BuildScheduledTestPod("p5", 500, 1, "n")),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildScheduledTestPod("p1", 100, 1, "n")},
+				{Pod: SetRSPodSpec(BuildScheduledTestPod("p2", 200, 1, "n"), "rs")},
+				{Pod: SetDSPodSpec(BuildScheduledTestPod("p3", 300, 1, "n"))},
+				{Pod: SetMirrorPodSpec(BuildScheduledTestPod("p4", 400, 1, "n"))},
+				{Pod: SetStaticPodSpec(BuildScheduledTestPod("p5", 500, 1, "n"))},
 			},
-			wantPods: []*apiv1.Pod{
-				BuildTestPod("p1", 100, 1),
-				SetRSPodSpec(BuildTestPod("p2", 200, 1), "rs"),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p1", 100, 1)},
+				{Pod: SetRSPodSpec(BuildTestPod("p2", 200, 1), "rs")},
 			},
 		},
 		{
 			name: "unschedulable pods, non-recreatable pods not filtered out",
-			unschedulablePods: []*apiv1.Pod{
-				BuildTestPod("p1", 100, 1),
-				SetRSPodSpec(BuildTestPod("p2", 200, 1), "rs"),
-				SetDSPodSpec(BuildTestPod("p3", 300, 1)),
-				SetMirrorPodSpec(BuildTestPod("p4", 400, 1)),
-				SetStaticPodSpec(BuildTestPod("p5", 500, 1)),
+			unschedulablePods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p1", 100, 1)},
+				{Pod: SetRSPodSpec(BuildTestPod("p2", 200, 1), "rs")},
+				{Pod: SetDSPodSpec(BuildTestPod("p3", 300, 1))},
+				{Pod: SetMirrorPodSpec(BuildTestPod("p4", 400, 1))},
+				{Pod: SetStaticPodSpec(BuildTestPod("p5", 500, 1))},
 			},
-			wantPods: []*apiv1.Pod{
-				BuildTestPod("p1", 100, 1),
-				SetRSPodSpec(BuildTestPod("p2", 200, 1), "rs"),
-				SetDSPodSpec(BuildTestPod("p3", 300, 1)),
-				SetMirrorPodSpec(BuildTestPod("p4", 400, 1)),
-				SetStaticPodSpec(BuildTestPod("p5", 500, 1)),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p1", 100, 1)},
+				{Pod: SetRSPodSpec(BuildTestPod("p2", 200, 1), "rs")},
+				{Pod: SetDSPodSpec(BuildTestPod("p3", 300, 1))},
+				{Pod: SetMirrorPodSpec(BuildTestPod("p4", 400, 1))},
+				{Pod: SetStaticPodSpec(BuildTestPod("p5", 500, 1))},
 			},
 		},
 		{
 			name:         "everything works together",
 			drainedNodes: []string{"n1", "n3", "n5"},
-			nodes: []*apiv1.Node{
-				BuildTestNode("n1", 1000, 10),
-				BuildTestNode("n2", 1000, 10),
-				BuildTestNode("n3", 1000, 10),
-				BuildTestNode("n4", 1000, 10),
-				BuildTestNode("n5", 1000, 10),
+			nodes: []*clustersnapshot.NodeResourceInfo{
+				{Node: BuildTestNode("n1", 1000, 10)},
+				{Node: BuildTestNode("n2", 1000, 10)},
+				{Node: BuildTestNode("n3", 1000, 10)},
+				{Node: BuildTestNode("n4", 1000, 10)},
+				{Node: BuildTestNode("n5", 1000, 10)},
 			},
-			pods: []*apiv1.Pod{
-				BuildScheduledTestPod("p1", 100, 1, "n1"),
-				BuildScheduledTestPod("p2", 200, 1, "n1"),
-				SetRSPodSpec(BuildScheduledTestPod("p3", 300, 1, "n1"), "rs"),
-				SetDSPodSpec(BuildScheduledTestPod("p4", 400, 1, "n1")),
-				BuildScheduledTestPod("p5", 500, 1, "n2"),
-				BuildScheduledTestPod("p6", 600, 1, "n2"),
-				BuildScheduledTestPod("p7", 700, 1, "n3"),
-				SetStaticPodSpec(BuildScheduledTestPod("p8", 800, 1, "n3")),
-				SetMirrorPodSpec(BuildScheduledTestPod("p9", 900, 1, "n3")),
+			pods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildScheduledTestPod("p1", 100, 1, "n1")},
+				{Pod: BuildScheduledTestPod("p2", 200, 1, "n1")},
+				{Pod: SetRSPodSpec(BuildScheduledTestPod("p3", 300, 1, "n1"), "rs")},
+				{Pod: SetDSPodSpec(BuildScheduledTestPod("p4", 400, 1, "n1"))},
+				{Pod: BuildScheduledTestPod("p5", 500, 1, "n2")},
+				{Pod: BuildScheduledTestPod("p6", 600, 1, "n2")},
+				{Pod: BuildScheduledTestPod("p7", 700, 1, "n3")},
+				{Pod: SetStaticPodSpec(BuildScheduledTestPod("p8", 800, 1, "n3"))},
+				{Pod: SetMirrorPodSpec(BuildScheduledTestPod("p9", 900, 1, "n3"))},
 			},
-			unschedulablePods: []*apiv1.Pod{
-				BuildTestPod("p10", 1000, 1),
-				SetMirrorPodSpec(BuildTestPod("p11", 1100, 1)),
-				SetStaticPodSpec(BuildTestPod("p12", 1200, 1)),
+			unschedulablePods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p10", 1000, 1)},
+				{Pod: SetMirrorPodSpec(BuildTestPod("p11", 1100, 1))},
+				{Pod: SetStaticPodSpec(BuildTestPod("p12", 1200, 1))},
 			},
-			wantPods: []*apiv1.Pod{
-				BuildTestPod("p1", 100, 1),
-				BuildTestPod("p2", 200, 1),
-				SetRSPodSpec(BuildTestPod("p3", 300, 1), "rs"),
-				BuildTestPod("p7", 700, 1),
-				BuildTestPod("p10", 1000, 1),
-				SetMirrorPodSpec(BuildTestPod("p11", 1100, 1)),
-				SetStaticPodSpec(BuildTestPod("p12", 1200, 1)),
+			wantPods: []*clustersnapshot.PodResourceInfo{
+				{Pod: BuildTestPod("p1", 100, 1)},
+				{Pod: BuildTestPod("p2", 200, 1)},
+				{Pod: SetRSPodSpec(BuildTestPod("p3", 300, 1), "rs")},
+				{Pod: BuildTestPod("p7", 700, 1)},
+				{Pod: BuildTestPod("p10", 1000, 1)},
+				{Pod: SetMirrorPodSpec(BuildTestPod("p11", 1100, 1))},
+				{Pod: SetStaticPodSpec(BuildTestPod("p12", 1200, 1))},
 			},
 		},
 	}
@@ -269,7 +269,7 @@ func TestCurrentlyDrainedNodesPodListProcessor(t *testing.T) {
 				ScaleDownActuator: &mockActuator{&mockActuationStatus{tc.drainedNodes}},
 				ClusterSnapshot:   &clustersnapshot.Handle{ClusterSnapshot: clustersnapshot.NewBasicClusterSnapshot()},
 			}
-			clustersnapshot.InitializeClusterSnapshotOrDie(t, ctx.ClusterSnapshot, tc.nodes, tc.pods)
+			clustersnapshot.InitializeClusterSnapshotWithDynamicResourcesOrDie(t, ctx.ClusterSnapshot, tc.nodes, tc.pods)
 
 			processor := NewCurrentlyDrainedNodesPodListProcessor()
 			pods, err := processor.Process(&ctx, tc.unschedulablePods)

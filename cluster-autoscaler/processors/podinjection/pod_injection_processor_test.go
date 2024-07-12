@@ -34,25 +34,25 @@ import (
 )
 
 func TestTargetCountInjectionPodListProcessor(t *testing.T) {
-	node := BuildTestNode("node1", 100, 0)
+	node := &clustersnapshot.NodeResourceInfo{Node: BuildTestNode("node1", 100, 0)}
 
 	replicaSet1 := createTestReplicaSet("rep-set-1", "default", 5)
-	scheduledPodRep1Copy1 := buildTestPod("default", "-scheduled-pod-rep1-1", withControllerOwnerRef(replicaSet1.Name, "ReplicaSet", replicaSet1.UID), withNodeName(node.Name))
+	scheduledPodRep1Copy1 := buildTestPod("default", "-scheduled-pod-rep1-1", withControllerOwnerRef(replicaSet1.Name, "ReplicaSet", replicaSet1.UID), withNodeName(node.Node.Name))
 	podRep1Copy1 := buildTestPod("default", "pod-rep1-1", withControllerOwnerRef(replicaSet1.Name, "ReplicaSet", replicaSet1.UID))
 	podRep1Copy2 := buildTestPod("default", "pod-rep1-2", withControllerOwnerRef(replicaSet1.Name, "ReplicaSet", replicaSet1.UID))
 
 	job1 := createTestJob("job-1", "default", 10, 10, 0)
-	scheduledPodJob1Copy1 := buildTestPod("default", "scheduled-pod-job1-1", withControllerOwnerRef(job1.Name, "Job", job1.UID), withNodeName(node.Name))
+	scheduledPodJob1Copy1 := buildTestPod("default", "scheduled-pod-job1-1", withControllerOwnerRef(job1.Name, "Job", job1.UID), withNodeName(node.Node.Name))
 	podJob1Copy1 := buildTestPod("default", "pod-job1-1", withControllerOwnerRef(job1.Name, "Job", job1.UID))
 	podJob1Copy2 := buildTestPod("default", "pod-job1-2", withControllerOwnerRef(job1.Name, "Job", job1.UID))
 
 	parallelStatefulset := createTestStatefulset("parallel-statefulset-1", "default", appsv1.ParallelPodManagement, 10)
-	scheduledParallelStatefulsetPod := buildTestPod("default", "parallel-scheduled-pod-statefulset-1", withControllerOwnerRef(parallelStatefulset.Name, "StatefulSet", parallelStatefulset.UID), withNodeName(node.Name))
+	scheduledParallelStatefulsetPod := buildTestPod("default", "parallel-scheduled-pod-statefulset-1", withControllerOwnerRef(parallelStatefulset.Name, "StatefulSet", parallelStatefulset.UID), withNodeName(node.Node.Name))
 	parallelStatefulsetPodCopy1 := buildTestPod("default", "parallel-pod-statefulset1-1", withControllerOwnerRef(parallelStatefulset.Name, "StatefulSet", parallelStatefulset.UID))
 	parallelStatefulsetPodCopy2 := buildTestPod("default", "parallel-pod-statefulset1-2", withControllerOwnerRef(parallelStatefulset.Name, "StatefulSet", parallelStatefulset.UID))
 
 	sequentialStatefulset := createTestStatefulset("sequential-statefulset-1", "default", appsv1.OrderedReadyPodManagement, 10)
-	scheduledSequentialStatefulsetPod := buildTestPod("default", "sequential-scheduled-pod-statefulset-1", withControllerOwnerRef(sequentialStatefulset.Name, "StatefulSet", sequentialStatefulset.UID), withNodeName(node.Name))
+	scheduledSequentialStatefulsetPod := buildTestPod("default", "sequential-scheduled-pod-statefulset-1", withControllerOwnerRef(sequentialStatefulset.Name, "StatefulSet", sequentialStatefulset.UID), withNodeName(node.Node.Name))
 	sequentialStatefulsetPodCopy1 := buildTestPod("default", "sequential-pod-statefulset1-1", withControllerOwnerRef(sequentialStatefulset.Name, "StatefulSet", sequentialStatefulset.UID))
 	sequentialStatefulsetPodCopy2 := buildTestPod("default", "sequential-pod-statefulset1-2", withControllerOwnerRef(sequentialStatefulset.Name, "StatefulSet", sequentialStatefulset.UID))
 
@@ -65,42 +65,42 @@ func TestTargetCountInjectionPodListProcessor(t *testing.T) {
 
 	testCases := []struct {
 		name             string
-		scheduledPods    []*apiv1.Pod
-		unschedulabePods []*apiv1.Pod
-		wantPods         []*apiv1.Pod
+		scheduledPods    []*clustersnapshot.PodResourceInfo
+		unschedulabePods []*clustersnapshot.PodResourceInfo
+		wantPods         []*clustersnapshot.PodResourceInfo
 	}{
 		{
 			name:             "ReplicaSet",
-			scheduledPods:    []*apiv1.Pod{scheduledPodRep1Copy1},
-			unschedulabePods: []*apiv1.Pod{podRep1Copy1, podRep1Copy2},
-			wantPods:         append([]*apiv1.Pod{podRep1Copy1, podRep1Copy2}, makeFakePods(replicaSet1.UID, podRep1Copy1, 2)...),
+			scheduledPods:    []*clustersnapshot.PodResourceInfo{scheduledPodRep1Copy1},
+			unschedulabePods: []*clustersnapshot.PodResourceInfo{podRep1Copy1, podRep1Copy2},
+			wantPods:         append([]*clustersnapshot.PodResourceInfo{podRep1Copy1, podRep1Copy2}, makeFakePods(replicaSet1.UID, podRep1Copy1, 2)...),
 		},
 		{
 			name:             "Job",
-			scheduledPods:    []*apiv1.Pod{scheduledPodJob1Copy1},
-			unschedulabePods: []*apiv1.Pod{podJob1Copy1, podJob1Copy2},
-			wantPods:         append([]*apiv1.Pod{podJob1Copy1, podJob1Copy2}, makeFakePods(job1.UID, podJob1Copy1, 7)...),
+			scheduledPods:    []*clustersnapshot.PodResourceInfo{scheduledPodJob1Copy1},
+			unschedulabePods: []*clustersnapshot.PodResourceInfo{podJob1Copy1, podJob1Copy2},
+			wantPods:         append([]*clustersnapshot.PodResourceInfo{podJob1Copy1, podJob1Copy2}, makeFakePods(job1.UID, podJob1Copy1, 7)...),
 		},
 		{
 			name:             "Statefulset - Parallel pod management policy",
-			scheduledPods:    []*apiv1.Pod{scheduledParallelStatefulsetPod},
-			unschedulabePods: []*apiv1.Pod{parallelStatefulsetPodCopy1, parallelStatefulsetPodCopy2},
-			wantPods:         append([]*apiv1.Pod{parallelStatefulsetPodCopy1, parallelStatefulsetPodCopy2}, makeFakePods(parallelStatefulset.UID, parallelStatefulsetPodCopy1, 7)...),
+			scheduledPods:    []*clustersnapshot.PodResourceInfo{scheduledParallelStatefulsetPod},
+			unschedulabePods: []*clustersnapshot.PodResourceInfo{parallelStatefulsetPodCopy1, parallelStatefulsetPodCopy2},
+			wantPods:         append([]*clustersnapshot.PodResourceInfo{parallelStatefulsetPodCopy1, parallelStatefulsetPodCopy2}, makeFakePods(parallelStatefulset.UID, parallelStatefulsetPodCopy1, 7)...),
 		},
 		{
 			name:             "Statefulset - sequential pod management policy",
-			scheduledPods:    []*apiv1.Pod{scheduledSequentialStatefulsetPod},
-			unschedulabePods: []*apiv1.Pod{sequentialStatefulsetPodCopy1, sequentialStatefulsetPodCopy2},
-			wantPods:         []*apiv1.Pod{sequentialStatefulsetPodCopy1, sequentialStatefulsetPodCopy2},
+			scheduledPods:    []*clustersnapshot.PodResourceInfo{scheduledSequentialStatefulsetPod},
+			unschedulabePods: []*clustersnapshot.PodResourceInfo{sequentialStatefulsetPodCopy1, sequentialStatefulsetPodCopy2},
+			wantPods:         []*clustersnapshot.PodResourceInfo{sequentialStatefulsetPodCopy1, sequentialStatefulsetPodCopy2},
 		},
 		{
 			name:             "Mix of controllers",
-			scheduledPods:    []*apiv1.Pod{scheduledPodRep1Copy1, scheduledPodJob1Copy1, scheduledParallelStatefulsetPod},
-			unschedulabePods: []*apiv1.Pod{podRep1Copy1, podRep1Copy2, podJob1Copy1, podJob1Copy2, parallelStatefulsetPodCopy1, parallelStatefulsetPodCopy2},
+			scheduledPods:    []*clustersnapshot.PodResourceInfo{scheduledPodRep1Copy1, scheduledPodJob1Copy1, scheduledParallelStatefulsetPod},
+			unschedulabePods: []*clustersnapshot.PodResourceInfo{podRep1Copy1, podRep1Copy2, podJob1Copy1, podJob1Copy2, parallelStatefulsetPodCopy1, parallelStatefulsetPodCopy2},
 			wantPods: append(
 				append(
 					append(
-						[]*apiv1.Pod{podRep1Copy1, podRep1Copy2, podJob1Copy1, podJob1Copy2, parallelStatefulsetPodCopy1, parallelStatefulsetPodCopy2},
+						[]*clustersnapshot.PodResourceInfo{podRep1Copy1, podRep1Copy2, podJob1Copy1, podJob1Copy2, parallelStatefulsetPodCopy1, parallelStatefulsetPodCopy2},
 						makeFakePods(replicaSet1.UID, podRep1Copy1, 2)...),
 					makeFakePods(job1.UID, podJob1Copy1, 7)...),
 				makeFakePods(parallelStatefulset.UID, parallelStatefulsetPodCopy1, 7)...,
@@ -114,13 +114,13 @@ func TestTargetCountInjectionPodListProcessor(t *testing.T) {
 			clusterSnapshot := clustersnapshot.NewDeltaClusterSnapshot()
 			clusterSnapshot.AddNode(node)
 			for _, pod := range tc.scheduledPods {
-				clusterSnapshot.AddPod(pod, node.Name)
+				clusterSnapshot.AddPod(pod, node.Node.Name)
 			}
 			ctx := context.AutoscalingContext{
 				AutoscalingKubeClients: context.AutoscalingKubeClients{
 					ListerRegistry: kubernetes.NewListerRegistry(nil, nil, nil, nil, nil, nil, jobLister, replicaSetLister, statefulsetLister),
 				},
-				ClusterSnapshot: clusterSnapshot,
+				ClusterSnapshot: &clustersnapshot.Handle{ClusterSnapshot: clusterSnapshot},
 			}
 			pods, err := p.Process(&ctx, tc.unschedulabePods)
 			assert.NoError(t, err)
@@ -161,8 +161,8 @@ func TestGroupPods(t *testing.T) {
 
 	testCases := []struct {
 		name            string
-		unscheduledPods []*apiv1.Pod
-		scheduledPods   []*apiv1.Pod
+		unscheduledPods []*clustersnapshot.PodResourceInfo
+		scheduledPods   []*clustersnapshot.PodResourceInfo
 		replicaSets     []*appsv1.ReplicaSet
 		jobs            []*batchv1.Job
 		statefulsets    []*appsv1.StatefulSet
@@ -178,7 +178,7 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			name:          "no unschedulable pods",
-			scheduledPods: []*apiv1.Pod{podRep1ScheduledCopy1, podRep1ScheduledCopy2, podRep2ScheduledCopy1},
+			scheduledPods: []*clustersnapshot.PodResourceInfo{podRep1ScheduledCopy1, podRep1ScheduledCopy2, podRep2ScheduledCopy1},
 			replicaSets:   []*appsv1.ReplicaSet{&replicaSet1, &replicaSet2},
 			wantGroupedPods: map[types.UID]podGroup{
 				replicaSet1.UID: {podCount: 2, desiredReplicas: 10, sample: nil},
@@ -187,8 +187,8 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			name:            "scheduled and unschedulable pods",
-			scheduledPods:   []*apiv1.Pod{podRep1ScheduledCopy2},
-			unscheduledPods: []*apiv1.Pod{podRep1Copy1, podRep2Copy1},
+			scheduledPods:   []*clustersnapshot.PodResourceInfo{podRep1ScheduledCopy2},
+			unscheduledPods: []*clustersnapshot.PodResourceInfo{podRep1Copy1, podRep2Copy1},
 			replicaSets:     []*appsv1.ReplicaSet{&replicaSet1, &replicaSet2},
 			wantGroupedPods: map[types.UID]podGroup{
 				replicaSet1.UID: {podCount: 2, desiredReplicas: 10, sample: podRep1Copy1, ownerUid: replicaSet1.UID},
@@ -197,17 +197,17 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			name:            "pods without a controller are ignored",
-			unscheduledPods: []*apiv1.Pod{noControllerPod},
+			unscheduledPods: []*clustersnapshot.PodResourceInfo{noControllerPod},
 			wantGroupedPods: map[types.UID]podGroup{},
 		},
 		{
 			name:            "unable to retrieve a controller - pods are ignored",
-			unscheduledPods: []*apiv1.Pod{podRep3Copy1},
+			unscheduledPods: []*clustersnapshot.PodResourceInfo{podRep3Copy1},
 			wantGroupedPods: map[types.UID]podGroup{},
 		},
 		{
 			name:            "pods form multiple replicaSets",
-			unscheduledPods: []*apiv1.Pod{podRep1Copy1, podRep1Copy2, podRep2Copy1},
+			unscheduledPods: []*clustersnapshot.PodResourceInfo{podRep1Copy1, podRep1Copy2, podRep2Copy1},
 			replicaSets:     []*appsv1.ReplicaSet{&replicaSet1, &replicaSet2},
 			wantGroupedPods: map[types.UID]podGroup{
 				replicaSet1.UID: {podCount: 2, desiredReplicas: 10, sample: podRep1Copy1, ownerUid: replicaSet1.UID},
@@ -216,7 +216,7 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			name:            "pods form multiple jobs",
-			unscheduledPods: []*apiv1.Pod{podJob1Copy1, podJob1Copy2, podJob2Copy1},
+			unscheduledPods: []*clustersnapshot.PodResourceInfo{podJob1Copy1, podJob1Copy2, podJob2Copy1},
 			jobs:            []*batchv1.Job{&job1, &job2},
 			wantGroupedPods: map[types.UID]podGroup{
 				job1.UID: {podCount: 2, desiredReplicas: 10, sample: podJob1Copy1, ownerUid: job1.UID},
@@ -225,7 +225,7 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			name:            "pods form multiple statefulsets",
-			unscheduledPods: []*apiv1.Pod{statefulset1Copy1, statefulset1Copy2, statefulset2Copy1},
+			unscheduledPods: []*clustersnapshot.PodResourceInfo{statefulset1Copy1, statefulset1Copy2, statefulset2Copy1},
 			statefulsets:    []*appsv1.StatefulSet{&statefulset1, &statefulset2},
 			wantGroupedPods: map[types.UID]podGroup{
 				statefulset1.UID: {podCount: 2, desiredReplicas: 10, sample: statefulset1Copy1, ownerUid: statefulset1.UID},
@@ -234,7 +234,7 @@ func TestGroupPods(t *testing.T) {
 		},
 		{
 			name:            "unscheduledPods from multiple different controllers",
-			unscheduledPods: []*apiv1.Pod{podRep1Copy1, podRep1Copy2, podRep2Copy1, podJob1Copy1, statefulset1Copy1},
+			unscheduledPods: []*clustersnapshot.PodResourceInfo{podRep1Copy1, podRep1Copy2, podRep2Copy1, podJob1Copy1, statefulset1Copy1},
 			replicaSets:     []*appsv1.ReplicaSet{&replicaSet1, &replicaSet2},
 			jobs:            []*batchv1.Job{&job1},
 			statefulsets:    []*appsv1.StatefulSet{&statefulset1},
@@ -278,7 +278,7 @@ func TestUpdatePodGroups(t *testing.T) {
 
 	testCases := []struct {
 		name         string
-		pod          *apiv1.Pod
+		pod          *clustersnapshot.PodResourceInfo
 		ownerRef     metav1.OwnerReference
 		podGroups    map[types.UID]podGroup
 		wantPodGroup map[types.UID]podGroup
@@ -307,7 +307,7 @@ func TestUpdatePodGroups(t *testing.T) {
 		{
 			name:      "sample pod added and count updated",
 			pod:       podRep1Copy1,
-			ownerRef:  podRep1Copy1.OwnerReferences[0],
+			ownerRef:  podRep1Copy1.Pod.OwnerReferences[0],
 			podGroups: samplePodGroups,
 			wantPodGroup: map[types.UID]podGroup{replicaSet1.UID: {
 				podCount:        1,
@@ -320,7 +320,7 @@ func TestUpdatePodGroups(t *testing.T) {
 		{
 			name:     "only count updated",
 			pod:      podRep1Copy2,
-			ownerRef: podRep1Copy1.OwnerReferences[0],
+			ownerRef: podRep1Copy1.Pod.OwnerReferences[0],
 			podGroups: map[types.UID]podGroup{replicaSet1.UID: {
 				podCount:        1,
 				desiredReplicas: 10,
@@ -353,10 +353,10 @@ func TestMakeFakePods(t *testing.T) {
 	fakePods := makeFakePods(ownerUid, samplePod, fakePodCount)
 	assert.Equal(t, fakePodCount, len(fakePods))
 	for idx, fakePod := range fakePods {
-		assert.Equal(t, fakePod.Name, fmt.Sprintf("%s-copy-%d", samplePod.Name, idx+1))
-		assert.Equal(t, fakePod.UID, types.UID(fmt.Sprintf("%s-%d", string(ownerUid), idx+1)))
-		assert.NotNil(t, fakePod.Annotations)
-		assert.Equal(t, fakePod.Annotations[FakePodAnnotationKey], FakePodAnnotationValue)
+		assert.Equal(t, fakePod.Pod.Name, fmt.Sprintf("%s-copy-%d", samplePod.Pod.Name, idx+1))
+		assert.Equal(t, fakePod.Pod.UID, types.UID(fmt.Sprintf("%s-%d", string(ownerUid), idx+1)))
+		assert.NotNil(t, fakePod.Pod.Annotations)
+		assert.Equal(t, fakePod.Pod.Annotations[FakePodAnnotationKey], FakePodAnnotationValue)
 	}
 
 	// Test case: Zero fake pod count
@@ -396,13 +396,13 @@ func createTestStatefulset(uid, namespace string, podManagementPolicy appsv1.Pod
 	}
 }
 
-func buildTestPod(namespace, name string, opts ...podOption) *apiv1.Pod {
+func buildTestPod(namespace, name string, opts ...podOption) *clustersnapshot.PodResourceInfo {
 	pod := BuildTestPod(name, 10, 10)
 	pod.Namespace = namespace
 	for _, opt := range opts {
 		opt(pod)
 	}
-	return pod
+	return &clustersnapshot.PodResourceInfo{Pod: pod}
 }
 
 type podOption func(*apiv1.Pod)
