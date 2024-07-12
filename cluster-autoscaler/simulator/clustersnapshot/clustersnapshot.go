@@ -37,27 +37,34 @@ type PodResourceInfo struct {
 	DynamicResourceRequests schedulerframework.PodDynamicResourceRequests
 }
 
+func (p *PodResourceInfo) DeepCopy() *PodResourceInfo {
+	return &PodResourceInfo{
+		Pod:                     p.Pod.DeepCopy(),
+		DynamicResourceRequests: p.DynamicResourceRequests.DeepCopy(),
+	}
+}
+
 // NewNodeResourceInfo combines a node with its associated DRA objects.
-func NewNodeResourceInfo(node *apiv1.Node, draObjects dynamicresources.Snapshot) NodeResourceInfo {
-	return NodeResourceInfo{Node: node, DynamicResources: draObjects.NodeResources(node)}
+func NewNodeResourceInfo(node *apiv1.Node, draObjects dynamicresources.Snapshot) *NodeResourceInfo {
+	return &NodeResourceInfo{Node: node, DynamicResources: draObjects.NodeResources(node)}
 }
 
 // NewPodResourceInfo combines a pod with its associated DRA objects.
-func NewPodResourceInfo(pod *apiv1.Pod, draObjects dynamicresources.Snapshot) PodResourceInfo {
-	return PodResourceInfo{Pod: pod, DynamicResourceRequests: draObjects.PodResourceRequests(pod)}
+func NewPodResourceInfo(pod *apiv1.Pod, draObjects dynamicresources.Snapshot) *PodResourceInfo {
+	return &PodResourceInfo{Pod: pod, DynamicResourceRequests: draObjects.PodResourceRequests(pod)}
 }
 
 // ResourceInfos translates a NodeInfo into a NodeResourceInfo and a list of PodResourceInfos.
-func ResourceInfos(nodeInfo *schedulerframework.NodeInfo) (NodeResourceInfo, []PodResourceInfo) {
-	var podInfos []PodResourceInfo
+func ResourceInfos(nodeInfo *schedulerframework.NodeInfo) (*NodeResourceInfo, []*PodResourceInfo) {
+	var podInfos []*PodResourceInfo
 	for _, p := range nodeInfo.Pods {
-		podInfos = append(podInfos, PodResourceInfo{Pod: p.Pod, DynamicResourceRequests: p.DynamicResourceRequests})
+		podInfos = append(podInfos, &PodResourceInfo{Pod: p.Pod, DynamicResourceRequests: p.DynamicResourceRequests})
 	}
-	return NodeResourceInfo{Node: nodeInfo.Node(), DynamicResources: nodeInfo.DynamicResources()}, podInfos
+	return &NodeResourceInfo{Node: nodeInfo.Node(), DynamicResources: nodeInfo.DynamicResources()}, podInfos
 }
 
 // NewNodeInfo creates a new NodeInfo based on a Node and its Pods, as well as any associated DRA objects.
-func NewNodeInfo(node NodeResourceInfo, pods []PodResourceInfo) *schedulerframework.NodeInfo {
+func NewNodeInfo(node *NodeResourceInfo, pods []*PodResourceInfo) *schedulerframework.NodeInfo {
 	result := schedulerframework.NewNodeInfo()
 	result.SetNodeWithDynamicResources(node.Node, node.DynamicResources)
 	for _, pod := range pods {
@@ -71,17 +78,17 @@ func NewNodeInfo(node NodeResourceInfo, pods []PodResourceInfo) *schedulerframew
 type ClusterSnapshot interface {
 	schedulerframework.SharedLister
 	// AddNode adds node to the snapshot.
-	AddNode(node NodeResourceInfo) error
+	AddNode(node *NodeResourceInfo) error
 	// AddNodes adds nodes to the snapshot.
-	AddNodes(nodes []NodeResourceInfo) error
+	AddNodes(nodes []*NodeResourceInfo) error
 	// RemoveNode removes a Node (as well as all associated info like its pods and dynamic resources) from the snapshot.
 	RemoveNode(nodeName string) error
 	// AddPod adds pod to the snapshot and schedules it to given node.
-	AddPod(pod PodResourceInfo, nodeName string) error
+	AddPod(pod *PodResourceInfo, nodeName string) error
 	// RemovePod removes a pod (as well as all associated info like its dynamic resource requests) from the snapshot.
 	RemovePod(namespace string, podName string, nodeName string) error
 	// AddNodeWithPods adds a node and set of pods to be scheduled to this node to the snapshot.
-	AddNodeWithPods(node NodeResourceInfo, pods []PodResourceInfo) error
+	AddNodeWithPods(node *NodeResourceInfo, pods []*PodResourceInfo) error
 	// IsPVCUsedByPods returns if the pvc is used by any pod, key = <namespace>/<pvc_name>
 	IsPVCUsedByPods(key string) bool
 

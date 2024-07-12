@@ -681,7 +681,7 @@ func TestPodsToEvict(t *testing.T) {
 	} {
 		t.Run(tn, func(t *testing.T) {
 			snapshot := clustersnapshot.NewBasicClusterSnapshot()
-			node := clustersnapshot.NodeResourceInfo{Node: BuildTestNode("test-node", 1000, 1000)}
+			node := &clustersnapshot.NodeResourceInfo{Node: BuildTestNode("test-node", 1000, 1000)}
 			err := snapshot.AddNodeWithPods(node, clustersnapshot.WrapPodsInResourceInfos(tc.pods))
 			if err != nil {
 				t.Errorf("AddNodeWithPods unexpected error: %v", err)

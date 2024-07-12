@@ -33,14 +33,14 @@ import (
 )
 
 func TestCheckPredicate(t *testing.T) {
-	p450 := clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p450", 450, 500000)}
-	p600 := clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p600", 600, 500000)}
-	p8000 := clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p8000", 8000, 0)}
-	p500 := clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p500", 500, 500000)}
+	p450 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p450", 450, 500000)}
+	p600 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p600", 600, 500000)}
+	p8000 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p8000", 8000, 0)}
+	p500 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p500", 500, 500000)}
 
-	n1000 := clustersnapshot.NodeResourceInfo{Node: BuildTestNode("n1000", 1000, 2000000)}
+	n1000 := &clustersnapshot.NodeResourceInfo{Node: BuildTestNode("n1000", 1000, 2000000)}
 	SetNodeReadyState(n1000.Node, true, time.Time{})
-	n1000Unschedulable := clustersnapshot.NodeResourceInfo{Node: BuildTestNode("n1000", 1000, 2000000)}
+	n1000Unschedulable := &clustersnapshot.NodeResourceInfo{Node: BuildTestNode("n1000", 1000, 2000000)}
 	SetNodeReadyState(n1000Unschedulable.Node, true, time.Time{})
 
 	defaultPredicateChecker, err := NewTestPredicateChecker()
@@ -67,9 +67,9 @@ func TestCheckPredicate(t *testing.T) {
 
 	tests := []struct {
 		name             string
-		node             clustersnapshot.NodeResourceInfo
-		scheduledPods    []clustersnapshot.PodResourceInfo
-		testPod          clustersnapshot.PodResourceInfo
+		node             *clustersnapshot.NodeResourceInfo
+		scheduledPods    []*clustersnapshot.PodResourceInfo
+		testPod          *clustersnapshot.PodResourceInfo
 		predicateChecker PredicateChecker
 		expectError      bool
 	}{
@@ -77,7 +77,7 @@ func TestCheckPredicate(t *testing.T) {
 		{
 			name:             "default - other pod - insuficient cpu",
 			node:             n1000,
-			scheduledPods:    []clustersnapshot.PodResourceInfo{p450},
+			scheduledPods:    []*clustersnapshot.PodResourceInfo{p450},
 			testPod:          p600,
 			expectError:      true,
 			predicateChecker: defaultPredicateChecker,
@@ -85,7 +85,7 @@ func TestCheckPredicate(t *testing.T) {
 		{
 			name:             "default - other pod - ok",
 			node:             n1000,
-			scheduledPods:    []clustersnapshot.PodResourceInfo{p450},
+			scheduledPods:    []*clustersnapshot.PodResourceInfo{p450},
 			testPod:          p500,
 			expectError:      false,
 			predicateChecker: defaultPredicateChecker,
@@ -93,7 +93,7 @@ func TestCheckPredicate(t *testing.T) {
 		{
 			name:             "default - empty - insuficient cpu",
 			node:             n1000,
-			scheduledPods:    []clustersnapshot.PodResourceInfo{},
+			scheduledPods:    []*clustersnapshot.PodResourceInfo{},
 			testPod:          p8000,
 			expectError:      true,
 			predicateChecker: defaultPredicateChecker,
@@ -101,7 +101,7 @@ func TestCheckPredicate(t *testing.T) {
 		{
 			name:             "default - empty - ok",
 			node:             n1000,
-			scheduledPods:    []clustersnapshot.PodResourceInfo{},
+			scheduledPods:    []*clustersnapshot.PodResourceInfo{},
 			testPod:          p600,
 			expectError:      false,
 			predicateChecker: defaultPredicateChecker,
@@ -110,7 +110,7 @@ func TestCheckPredicate(t *testing.T) {
 		{
 			name:             "custom - other pod - ok",
 			node:             n1000,
-			scheduledPods:    []clustersnapshot.PodResourceInfo{p450},
+			scheduledPods:    []*clustersnapshot.PodResourceInfo{p450},
 			testPod:          p600,
 			expectError:      false,
 			predicateChecker: customPredicateChecker,
@@ -118,7 +118,7 @@ func TestCheckPredicate(t *testing.T) {
 		{
 			name:             "custom -other pod - ok",
 			node:             n1000,
-			scheduledPods:    []clustersnapshot.PodResourceInfo{p450},
+			scheduledPods:    []*clustersnapshot.PodResourceInfo{p450},
 			testPod:          p500,
 			expectError:      false,
 			predicateChecker: customPredicateChecker,
@@ -126,7 +126,7 @@ func TestCheckPredicate(t *testing.T) {
 		{
 			name:             "custom -empty - ok",
 			node:             n1000,
-			scheduledPods:    []clustersnapshot.PodResourceInfo{},
+			scheduledPods:    []*clustersnapshot.PodResourceInfo{},
 			testPod:          p8000,
 			expectError:      false,
 			predicateChecker: customPredicateChecker,
@@ -134,7 +134,7 @@ func TestCheckPredicate(t *testing.T) {
 		{
 			name:             "custom -empty - ok",
 			node:             n1000,
-			scheduledPods:    []clustersnapshot.PodResourceInfo{},
+			scheduledPods:    []*clustersnapshot.PodResourceInfo{},
 			testPod:          p600,
 			expectError:      false,
 			predicateChecker: customPredicateChecker,
@@ -165,8 +165,8 @@ func TestFitsAnyNode(t *testing.T) {
 	p1900 := BuildTestPod("p1900", 1900, 1000)
 	p2100 := BuildTestPod("p2100", 2100, 1000)
 
-	n1000 := clustersnapshot.NodeResourceInfo{Node: BuildTestNode("n1000", 1000, 2000000)}
-	n2000 := clustersnapshot.NodeResourceInfo{Node: BuildTestNode("n2000", 2000, 2000000)}
+	n1000 := &clustersnapshot.NodeResourceInfo{Node: BuildTestNode("n1000", 1000, 2000000)}
+	n2000 := &clustersnapshot.NodeResourceInfo{Node: BuildTestNode("n2000", 2000, 2000000)}
 
 	defaultPredicateChecker, err := NewTestPredicateChecker()
 	assert.NoError(t, err)
@@ -265,7 +265,7 @@ func TestFitsAnyNode(t *testing.T) {
 
 func TestDebugInfo(t *testing.T) {
 	p1 := BuildTestPod("p1", 0, 0)
-	node1 := clustersnapshot.NodeResourceInfo{Node: BuildTestNode("n1", 1000, 2000000)}
+	node1 := &clustersnapshot.NodeResourceInfo{Node: BuildTestNode("n1", 1000, 2000000)}
 	node1.Node.Spec.Taints = []apiv1.Taint{
 		{
 			Key:    "SomeTaint",

@@ -35,14 +35,14 @@ import (
 // list for DaemonSets that don't have a pod running on the Node but should have.
 //
 // scheduledPods are not modified. Neither the returned pods nor the DRA objects are sanitized.
-func NodeStartupPods(node *apiv1.Node, draSnapshot dynamicresources.Snapshot, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) ([]clustersnapshot.PodResourceInfo, errors.AutoscalerError) {
+func NodeStartupPods(node *apiv1.Node, draSnapshot dynamicresources.Snapshot, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) ([]*clustersnapshot.PodResourceInfo, errors.AutoscalerError) {
 	nodeInfo := schedulerframework.NewNodeInfo()
 	nodeInfo.SetNodeWithDynamicResources(node, draSnapshot.NodeResources(node))
 	return getStartupPods(nodeInfo, draSnapshot, scheduledPods, daemonsets, forceDaemonSets)
 }
 
-func getStartupPods(nodeInfo *schedulerframework.NodeInfo, draSnapshot dynamicresources.Snapshot, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) ([]clustersnapshot.PodResourceInfo, errors.AutoscalerError) {
-	var result []clustersnapshot.PodResourceInfo
+func getStartupPods(nodeInfo *schedulerframework.NodeInfo, draSnapshot dynamicresources.Snapshot, scheduledPods []*apiv1.Pod, daemonsets []*appsv1.DaemonSet, forceDaemonSets bool) ([]*clustersnapshot.PodResourceInfo, errors.AutoscalerError) {
+	var result []*clustersnapshot.PodResourceInfo
 	runningDS := make(map[types.UID]bool)
 	for _, pod := range scheduledPods {
 		// Ignore scheduled pods in deletion phase
@@ -75,7 +75,7 @@ func getStartupPods(nodeInfo *schedulerframework.NodeInfo, draSnapshot dynamicre
 		}
 		for _, pod := range daemonPods {
 			// TODO(DRA): Simulate DRA requests for simulated DS pods.
-			result = append(result, clustersnapshot.PodResourceInfo{Pod: pod, DynamicResourceRequests: schedulerframework.PodDynamicResourceRequests{}})
+			result = append(result, &clustersnapshot.PodResourceInfo{Pod: pod, DynamicResourceRequests: schedulerframework.PodDynamicResourceRequests{}})
 		}
 	}
 	return result, nil

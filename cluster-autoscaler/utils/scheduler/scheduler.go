@@ -58,7 +58,7 @@ func DeepCopyTemplateNode(nodeTemplate *schedulerframework.NodeInfo, suffix stri
 	nodeInfo := schedulerframework.NewNodeInfo()
 	nodeInfo.SetNodeWithDynamicResources(node, dynamicresources.SanitizedNodeDynamicResources(nodeTemplate.DynamicResources(), node.Name, suffix))
 	for _, podInfo := range nodeTemplate.Pods {
-		sanitizedPod := utils.SanitizePod(clustersnapshot.PodResourceInfo{Pod: podInfo.Pod, DynamicResourceRequests: podInfo.DynamicResourceRequests}, node.Name, suffix)
+		sanitizedPod := utils.SanitizePod(&clustersnapshot.PodResourceInfo{Pod: podInfo.Pod, DynamicResourceRequests: podInfo.DynamicResourceRequests}, node.Name, suffix)
 		nodeInfo.AddPodWithDynamicRequests(sanitizedPod.Pod, sanitizedPod.DynamicResourceRequests)
 	}
 	return nodeInfo

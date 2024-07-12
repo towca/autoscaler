@@ -135,7 +135,7 @@ func (data *internalDeltaSnapshotData) buildNodeInfoList() []*schedulerframework
 }
 
 // Convenience method to avoid writing loop for adding nodes.
-func (data *internalDeltaSnapshotData) addNodes(nodes []NodeResourceInfo) error {
+func (data *internalDeltaSnapshotData) addNodes(nodes []*NodeResourceInfo) error {
 	for _, node := range nodes {
 		if err := data.addNode(node); err != nil {
 			return err
@@ -144,7 +144,7 @@ func (data *internalDeltaSnapshotData) addNodes(nodes []NodeResourceInfo) error 
 	return nil
 }
 
-func (data *internalDeltaSnapshotData) addNode(node NodeResourceInfo) error {
+func (data *internalDeltaSnapshotData) addNode(node *NodeResourceInfo) error {
 	nodeInfo := schedulerframework.NewNodeInfo()
 	nodeInfo.SetNodeWithDynamicResources(node.Node, node.DynamicResources)
 	return data.addNodeInfo(nodeInfo)
@@ -235,7 +235,7 @@ func (data *internalDeltaSnapshotData) nodeInfoToModify(nodeName string) (*sched
 	return dni, true
 }
 
-func (data *internalDeltaSnapshotData) addPod(pod PodResourceInfo, nodeName string) error {
+func (data *internalDeltaSnapshotData) addPod(pod *PodResourceInfo, nodeName string) error {
 	ni, found := data.nodeInfoToModify(nodeName)
 	if !found {
 		return ErrNodeNotFound
@@ -402,17 +402,17 @@ func NewDeltaClusterSnapshot() *DeltaClusterSnapshot {
 }
 
 // AddNode adds node to the snapshot.
-func (snapshot *DeltaClusterSnapshot) AddNode(node NodeResourceInfo) error {
+func (snapshot *DeltaClusterSnapshot) AddNode(node *NodeResourceInfo) error {
 	return snapshot.data.addNode(node)
 }
 
 // AddNodes adds nodes in batch to the snapshot.
-func (snapshot *DeltaClusterSnapshot) AddNodes(nodes []NodeResourceInfo) error {
+func (snapshot *DeltaClusterSnapshot) AddNodes(nodes []*NodeResourceInfo) error {
 	return snapshot.data.addNodes(nodes)
 }
 
 // AddNodeWithPods adds a node and set of pods to be scheduled to this node to the snapshot.
-func (snapshot *DeltaClusterSnapshot) AddNodeWithPods(node NodeResourceInfo, pods []PodResourceInfo) error {
+func (snapshot *DeltaClusterSnapshot) AddNodeWithPods(node *NodeResourceInfo, pods []*PodResourceInfo) error {
 	if err := snapshot.AddNode(node); err != nil {
 		return err
 	}
@@ -430,7 +430,7 @@ func (snapshot *DeltaClusterSnapshot) RemoveNode(nodeName string) error {
 }
 
 // AddPod adds pod to the snapshot and schedules it to given node.
-func (snapshot *DeltaClusterSnapshot) AddPod(pod PodResourceInfo, nodeName string) error {
+func (snapshot *DeltaClusterSnapshot) AddPod(pod *PodResourceInfo, nodeName string) error {
 	return snapshot.data.addPod(pod, nodeName)
 }
 

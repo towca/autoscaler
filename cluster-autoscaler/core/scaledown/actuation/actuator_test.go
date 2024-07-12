@@ -1157,7 +1157,7 @@ func TestStartDeletion(t *testing.T) {
 				csr := clusterstate.NewClusterStateRegistry(provider, clusterstate.ClusterStateRegistryConfig{}, ctx.LogRecorder, NewBackoff(), nodegroupconfig.NewDefaultNodeGroupConfigProcessor(config.NodeGroupAutoscalingOptions{MaxNodeProvisionTime: 15 * time.Minute}), asyncnodegroups.NewDefaultAsyncNodeGroupStateChecker())
 				for _, bucket := range emptyNodeGroupViews {
 					for _, node := range bucket.Nodes {
-						err := ctx.ClusterSnapshot.AddNodeWithPods(clustersnapshot.NodeResourceInfo{Node: node}, clustersnapshot.WrapPodsInResourceInfos(tc.pods[node.Name]))
+						err := ctx.ClusterSnapshot.AddNodeWithPods(&clustersnapshot.NodeResourceInfo{Node: node}, clustersnapshot.WrapPodsInResourceInfos(tc.pods[node.Name]))
 						if err != nil {
 							t.Fatalf("Couldn't add node %q to snapshot: %v", node.Name, err)
 						}
@@ -1169,7 +1169,7 @@ func TestStartDeletion(t *testing.T) {
 						if !found {
 							t.Fatalf("Drain node %q doesn't have pods defined in the test case.", node.Name)
 						}
-						err := ctx.ClusterSnapshot.AddNodeWithPods(clustersnapshot.NodeResourceInfo{Node: node}, clustersnapshot.WrapPodsInResourceInfos(pods))
+						err := ctx.ClusterSnapshot.AddNodeWithPods(&clustersnapshot.NodeResourceInfo{Node: node}, clustersnapshot.WrapPodsInResourceInfos(pods))
 						if err != nil {
 							t.Fatalf("Couldn't add node %q to snapshot: %v", node.Name, err)
 						}

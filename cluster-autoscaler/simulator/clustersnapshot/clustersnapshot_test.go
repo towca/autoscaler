@@ -42,17 +42,17 @@ func nodeNames(nodes []*apiv1.Node) []string {
 	return names
 }
 
-func extractNodes(nodeInfos []*schedulerframework.NodeInfo) []NodeResourceInfo {
-	nodes := []NodeResourceInfo{}
+func extractNodes(nodeInfos []*schedulerframework.NodeInfo) []*NodeResourceInfo {
+	nodes := []*NodeResourceInfo{}
 	for _, ni := range nodeInfos {
-		nodes = append(nodes, NodeResourceInfo{Node: ni.Node()})
+		nodes = append(nodes, &NodeResourceInfo{Node: ni.Node()})
 	}
 	return nodes
 }
 
 type snapshotState struct {
-	nodes []NodeResourceInfo
-	pods  []PodResourceInfo
+	nodes []*NodeResourceInfo
+	pods  []*PodResourceInfo
 }
 
 func compareStates(t *testing.T, a, b snapshotState) {
@@ -63,10 +63,10 @@ func compareStates(t *testing.T, a, b snapshotState) {
 func getSnapshotState(t *testing.T, snapshot ClusterSnapshot) snapshotState {
 	nodes, err := snapshot.NodeInfos().List()
 	assert.NoError(t, err)
-	var pods []PodResourceInfo
+	var pods []*PodResourceInfo
 	for _, nodeInfo := range nodes {
 		for _, podInfo := range nodeInfo.Pods {
-			pods = append(pods, PodResourceInfo{Pod: podInfo.Pod})
+			pods = append(pods, &PodResourceInfo{Pod: podInfo.Pod})
 		}
 	}
 	return snapshotState{nodes: extractNodes(nodes), pods: pods}
@@ -91,8 +91,8 @@ type modificationTestCase struct {
 }
 
 func validTestCases(t *testing.T) []modificationTestCase {
-	node := NodeResourceInfo{Node: BuildTestNode("specialNode", 10, 100)}
-	pod := PodResourceInfo{Pod: BuildTestPod("specialPod", 1, 1)}
+	node := &NodeResourceInfo{Node: BuildTestNode("specialNode", 10, 100)}
+	pod := &PodResourceInfo{Pod: BuildTestPod("specialPod", 1, 1)}
 	pod.Pod.Spec.NodeName = node.Node.Name
 
 	testCases := []modificationTestCase{
@@ -103,24 +103,24 @@ func validTestCases(t *testing.T) []modificationTestCase {
 				assert.NoError(t, err)
 			},
 			modifiedState: snapshotState{
-				nodes: []NodeResourceInfo{node},
+				nodes: []*NodeResourceInfo{node},
 			},
 		},
 		{
 			name: "add node with pods",
 			op: func(snapshot ClusterSnapshot) {
-				err := snapshot.AddNodeWithPods(node, []PodResourceInfo{pod})
+				err := snapshot.AddNodeWithPods(node, []*PodResourceInfo{pod})
 				assert.NoError(t, err)
 			},
 			modifiedState: snapshotState{
-				nodes: []NodeResourceInfo{node},
-				pods:  []PodResourceInfo{pod},
+				nodes: []*NodeResourceInfo{node},
+				pods:  []*PodResourceInfo{pod},
 			},
 		},
 		{
 			name: "remove node",
 			state: snapshotState{
-				nodes: []NodeResourceInfo{node},
+				nodes: []*NodeResourceInfo{node},
 			},
 			op: func(snapshot ClusterSnapshot) {
 				err := snapshot.RemoveNode(node.Node.Name)
@@ -130,7 +130,7 @@ func validTestCases(t *testing.T) []modificationTestCase {
 		{
 			name: "remove node, then add it back",
 			state: snapshotState{
-				nodes: []NodeResourceInfo{node},
+				nodes: []*NodeResourceInfo{node},
 			},
 			op: func(snapshot ClusterSnapshot) {
 				err := snapshot.RemoveNode(node.Node.Name)
@@ -140,13 +140,13 @@ func validTestCases(t *testing.T) []modificationTestCase {
 				assert.NoError(t, err)
 			},
 			modifiedState: snapshotState{
-				nodes: []NodeResourceInfo{node},
+				nodes: []*NodeResourceInfo{node},
 			},
 		},
 		{
 			name: "add pod, then remove node",
 			state: snapshotState{
-				nodes: []NodeResourceInfo{node},
+				nodes: []*NodeResourceInfo{node},
 			},
 			op: func(snapshot ClusterSnapshot) {
 				err := snapshot.AddPod(pod, node.Node.Name)
@@ -162,7 +162,7 @@ func validTestCases(t *testing.T) []modificationTestCase {
 
 func TestForking(t *testing.T) {
 	testCases := validTestCases(t)
-	node := NodeResourceInfo{Node: BuildTestNode("specialNode-2", 10, 100)}
+	node := &NodeResourceInfo{Node: BuildTestNode("specialNode-2", 10, 100)}
 
 	for name, snapshotFactory := range snapshots {
 		for _, tc := range testCases {
@@ -295,14 +295,14 @@ func TestClear(t *testing.T) {
 
 	extraNodes := createTestNodesWithPrefix("extra", extraNodeCount)
 
-	allNodes := make([]NodeResourceInfo, len(nodes)+len(extraNodes), len(nodes)+len(extraNodes))
+	allNodes := make([]*NodeResourceInfo, len(nodes)+len(extraNodes), len(nodes)+len(extraNodes))
 	copy(allNodes, nodes)
 	copy(allNodes[len(nodes):], extraNodes)
 
 	extraPods := createTestPodsWithPrefix("extra", extraPodCount)
 	assignPodsToNodes(extraPods, allNodes)
 
-	allPods := make([]PodResourceInfo, len(pods)+len(extraPods), len(pods)+len(extraPods))
+	allPods := make([]*PodResourceInfo, len(pods)+len(extraPods), len(pods)+len(extraPods))
 	copy(allPods, pods)
 	copy(allPods[len(pods):], extraPods)
 
@@ -351,7 +351,7 @@ func TestNode404(t *testing.T) {
 		op   func(ClusterSnapshot) error
 	}{
 		{"add pod", func(snapshot ClusterSnapshot) error {
-			return snapshot.AddPod(PodResourceInfo{Pod: BuildTestPod("p1", 0, 0)}, "node")
+			return snapshot.AddPod(&PodResourceInfo{Pod: BuildTestPod("p1", 0, 0)}, "node")
 		}},
 		{"remove pod", func(snapshot ClusterSnapshot) error {
 			return snapshot.RemovePod("default", "p1", "node")
@@ -380,7 +380,7 @@ func TestNode404(t *testing.T) {
 				func(t *testing.T) {
 					snapshot := snapshotFactory()
 
-					node := NodeResourceInfo{Node: BuildTestNode("node", 10, 100)}
+					node := &NodeResourceInfo{Node: BuildTestNode("node", 10, 100)}
 					err := snapshot.AddNode(node)
 					assert.NoError(t, err)
 
@@ -406,7 +406,7 @@ func TestNode404(t *testing.T) {
 				func(t *testing.T) {
 					snapshot := snapshotFactory()
 
-					node := NodeResourceInfo{Node: BuildTestNode("node", 10, 100)}
+					node := &NodeResourceInfo{Node: BuildTestNode("node", 10, 100)}
 					err := snapshot.AddNode(node)
 					assert.NoError(t, err)
 
@@ -422,8 +422,8 @@ func TestNode404(t *testing.T) {
 }
 
 func TestNodeAlreadyExists(t *testing.T) {
-	node := NodeResourceInfo{Node: BuildTestNode("node", 10, 100)}
-	pod := PodResourceInfo{Pod: BuildTestPod("pod", 1, 1)}
+	node := &NodeResourceInfo{Node: BuildTestNode("node", 10, 100)}
+	pod := &PodResourceInfo{Pod: BuildTestPod("pod", 1, 1)}
 	pod.Pod.Spec.NodeName = node.Node.Name
 
 	ops := []struct {
@@ -434,7 +434,7 @@ func TestNodeAlreadyExists(t *testing.T) {
 			return snapshot.AddNode(node)
 		}},
 		{"add node with pod", func(snapshot ClusterSnapshot) error {
-			return snapshot.AddNodeWithPods(node, []PodResourceInfo{pod})
+			return snapshot.AddNodeWithPods(node, []*PodResourceInfo{pod})
 		}},
 	}
 
@@ -501,8 +501,8 @@ func TestNodeAlreadyExists(t *testing.T) {
 }
 
 func TestPVCUsedByPods(t *testing.T) {
-	node := NodeResourceInfo{Node: BuildTestNode("node", 10, 10)}
-	pod1 := PodResourceInfo{Pod: BuildTestPod("pod1", 10, 10)}
+	node := &NodeResourceInfo{Node: BuildTestNode("node", 10, 10)}
+	pod1 := &PodResourceInfo{Pod: BuildTestPod("pod1", 10, 10)}
 	pod1.Pod.Spec.NodeName = node.Node.Name
 	pod1.Pod.Spec.Volumes = []apiv1.Volume{
 		{
@@ -514,7 +514,7 @@ func TestPVCUsedByPods(t *testing.T) {
 			},
 		},
 	}
-	pod2 := PodResourceInfo{Pod: BuildTestPod("pod2", 10, 10)}
+	pod2 := &PodResourceInfo{Pod: BuildTestPod("pod2", 10, 10)}
 	pod2.Pod.Spec.NodeName = node.Node.Name
 	pod2.Pod.Spec.Volumes = []apiv1.Volume{
 		{
@@ -534,7 +534,7 @@ func TestPVCUsedByPods(t *testing.T) {
 			},
 		},
 	}
-	nonPvcPod := PodResourceInfo{Pod: BuildTestPod("pod3", 10, 10)}
+	nonPvcPod := &PodResourceInfo{Pod: BuildTestPod("pod3", 10, 10)}
 	nonPvcPod.Pod.Spec.NodeName = node.Node.Name
 	nonPvcPod.Pod.Spec.Volumes = []apiv1.Volume{
 		{
@@ -550,8 +550,8 @@ func TestPVCUsedByPods(t *testing.T) {
 	}
 	testcase := []struct {
 		desc              string
-		node              NodeResourceInfo
-		pods              []PodResourceInfo
+		node              *NodeResourceInfo
+		pods              []*PodResourceInfo
 		claimName         string
 		exists            bool
 		removePod         string
@@ -560,7 +560,7 @@ func TestPVCUsedByPods(t *testing.T) {
 		{
 			desc:      "pvc new pod with volume fetch",
 			node:      node,
-			pods:      []PodResourceInfo{pod1},
+			pods:      []*PodResourceInfo{pod1},
 			claimName: "claim1",
 			exists:    true,
 			removePod: "",
@@ -568,7 +568,7 @@ func TestPVCUsedByPods(t *testing.T) {
 		{
 			desc:      "pvc new pod with incorrect volume fetch",
 			node:      node,
-			pods:      []PodResourceInfo{pod1},
+			pods:      []*PodResourceInfo{pod1},
 			claimName: "incorrect-claim",
 			exists:    false,
 			removePod: "",
@@ -576,7 +576,7 @@ func TestPVCUsedByPods(t *testing.T) {
 		{
 			desc:      "new pod with non-pvc volume fetch",
 			node:      node,
-			pods:      []PodResourceInfo{nonPvcPod},
+			pods:      []*PodResourceInfo{nonPvcPod},
 			claimName: "incorrect-claim",
 			exists:    false,
 			removePod: "",
@@ -584,7 +584,7 @@ func TestPVCUsedByPods(t *testing.T) {
 		{
 			desc:              "pvc new pod with delete volume fetch",
 			node:              node,
-			pods:              []PodResourceInfo{pod1},
+			pods:              []*PodResourceInfo{pod1},
 			claimName:         "claim1",
 			exists:            true,
 			removePod:         "pod1",
@@ -593,7 +593,7 @@ func TestPVCUsedByPods(t *testing.T) {
 		{
 			desc:              "pvc two pods with duplicated volume, delete one pod, fetch",
 			node:              node,
-			pods:              []PodResourceInfo{pod1, pod2},
+			pods:              []*PodResourceInfo{pod1, pod2},
 			claimName:         "claim1",
 			exists:            true,
 			removePod:         "pod1",
@@ -602,7 +602,7 @@ func TestPVCUsedByPods(t *testing.T) {
 		{
 			desc:              "pvc and non-pvc pods, fetch and delete non-pvc pod",
 			node:              node,
-			pods:              []PodResourceInfo{pod1, nonPvcPod},
+			pods:              []*PodResourceInfo{pod1, nonPvcPod},
 			claimName:         "claim1",
 			exists:            true,
 			removePod:         "pod3",
@@ -611,7 +611,7 @@ func TestPVCUsedByPods(t *testing.T) {
 		{
 			desc:              "pvc and non-pvc pods, delete pvc pod and fetch",
 			node:              node,
-			pods:              []PodResourceInfo{pod1, nonPvcPod},
+			pods:              []*PodResourceInfo{pod1, nonPvcPod},
 			claimName:         "claim1",
 			exists:            true,
 			removePod:         "pod1",
@@ -642,8 +642,8 @@ func TestPVCUsedByPods(t *testing.T) {
 }
 
 func TestPVCClearAndFork(t *testing.T) {
-	node := NodeResourceInfo{Node: BuildTestNode("node", 10, 10)}
-	pod1 := PodResourceInfo{Pod: BuildTestPod("pod1", 10, 10)}
+	node := &NodeResourceInfo{Node: BuildTestNode("node", 10, 10)}
+	pod1 := &PodResourceInfo{Pod: BuildTestPod("pod1", 10, 10)}
 	pod1.Pod.Spec.NodeName = node.Node.Name
 	pod1.Pod.Spec.Volumes = []apiv1.Volume{
 		{
@@ -655,7 +655,7 @@ func TestPVCClearAndFork(t *testing.T) {
 			},
 		},
 	}
-	pod2 := PodResourceInfo{Pod: BuildTestPod("pod2", 10, 10)}
+	pod2 := &PodResourceInfo{Pod: BuildTestPod("pod2", 10, 10)}
 	pod2.Pod.Spec.NodeName = node.Node.Name
 	pod2.Pod.Spec.Volumes = []apiv1.Volume{
 		{
@@ -675,7 +675,7 @@ func TestPVCClearAndFork(t *testing.T) {
 			},
 		},
 	}
-	nonPvcPod := PodResourceInfo{Pod: BuildTestPod("pod3", 10, 10)}
+	nonPvcPod := &PodResourceInfo{Pod: BuildTestPod("pod3", 10, 10)}
 	nonPvcPod.Pod.Spec.NodeName = node.Node.Name
 	nonPvcPod.Pod.Spec.Volumes = []apiv1.Volume{
 		{
@@ -693,7 +693,7 @@ func TestPVCClearAndFork(t *testing.T) {
 	for snapshotName, snapshotFactory := range snapshots {
 		t.Run(fmt.Sprintf("fork and revert snapshot with pvc pods with snapshot: %s", snapshotName), func(t *testing.T) {
 			snapshot := snapshotFactory()
-			err := snapshot.AddNodeWithPods(node, []PodResourceInfo{pod1})
+			err := snapshot.AddNodeWithPods(node, []*PodResourceInfo{pod1})
 			assert.NoError(t, err)
 			volumeExists := snapshot.IsPVCUsedByPods(schedulerframework.GetNamespacedName("default", "claim1"))
 			assert.Equal(t, true, volumeExists)
@@ -718,7 +718,7 @@ func TestPVCClearAndFork(t *testing.T) {
 
 		t.Run(fmt.Sprintf("clear snapshot with pvc pods with snapshot: %s", snapshotName), func(t *testing.T) {
 			snapshot := snapshotFactory()
-			err := snapshot.AddNodeWithPods(node, []PodResourceInfo{pod1})
+			err := snapshot.AddNodeWithPods(node, []*PodResourceInfo{pod1})
 			assert.NoError(t, err)
 			volumeExists := snapshot.IsPVCUsedByPods(schedulerframework.GetNamespacedName("default", "claim1"))
 			assert.Equal(t, true, volumeExists)

@@ -180,12 +180,12 @@ func TestFilterOutSchedulable(t *testing.T) {
 			allExpectedScheduledPods = append(allExpectedScheduledPods, tc.expectedScheduledPods...)
 
 			for node, pods := range tc.nodesWithPods {
-				err := clusterSnapshot.AddNode(clustersnapshot.NodeResourceInfo{Node: node})
+				err := clusterSnapshot.AddNode(&clustersnapshot.NodeResourceInfo{Node: node})
 				assert.NoError(t, err)
 
 				for _, pod := range pods {
 					pod.Spec.NodeName = node.Name
-					err = clusterSnapshot.AddPod(clustersnapshot.PodResourceInfo{Pod: pod}, node.Name)
+					err = clusterSnapshot.AddPod(&clustersnapshot.PodResourceInfo{Pod: pod}, node.Name)
 					assert.NoError(t, err)
 
 					allExpectedScheduledPods = append(allExpectedScheduledPods, pod)
@@ -263,9 +263,9 @@ func BenchmarkFilterOutSchedulable(b *testing.B) {
 				for i := 0; i < tc.pendingPods; i++ {
 					pendingPods[i] = BuildTestPod(fmt.Sprintf("p-%d", i), 1000, 2000000)
 				}
-				nodes := make([]clustersnapshot.NodeResourceInfo, tc.nodes, tc.nodes)
+				nodes := make([]*clustersnapshot.NodeResourceInfo, tc.nodes, tc.nodes)
 				for i := 0; i < tc.nodes; i++ {
-					nodes[i] = clustersnapshot.NodeResourceInfo{Node: BuildTestNode(fmt.Sprintf("n-%d", i), 2000, 200000)}
+					nodes[i] = &clustersnapshot.NodeResourceInfo{Node: BuildTestNode(fmt.Sprintf("n-%d", i), 2000, 200000)}
 					SetNodeReadyState(nodes[i].Node, true, time.Time{})
 				}
 				scheduledPods := make([]*apiv1.Pod, tc.scheduledPods, tc.scheduledPods)
@@ -288,7 +288,7 @@ func BenchmarkFilterOutSchedulable(b *testing.B) {
 				}
 
 				for _, pod := range scheduledPods {
-					if err := clusterSnapshot.AddPod(clustersnapshot.PodResourceInfo{Pod: pod}, pod.Spec.NodeName); err != nil {
+					if err := clusterSnapshot.AddPod(&clustersnapshot.PodResourceInfo{Pod: pod}, pod.Spec.NodeName); err != nil {
 						assert.NoError(b, err)
 					}
 				}

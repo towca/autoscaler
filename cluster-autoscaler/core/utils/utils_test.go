@@ -32,13 +32,13 @@ import (
 )
 
 func TestSanitizePods(t *testing.T) {
-	pod1 := clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p1", 80, 0)}
+	pod1 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p1", 80, 0)}
 	pod1.Pod.UID = "uid1"
 	pod1.Pod.Spec.NodeName = "n1"
-	pod2 := clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p2", 80, 0)}
+	pod2 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p2", 80, 0)}
 	pod2.Pod.UID = "uid2"
 	pod2.Pod.Spec.NodeName = "n2"
-	pods := []clustersnapshot.PodResourceInfo{pod1, pod2}
+	pods := []*clustersnapshot.PodResourceInfo{pod1, pod2}
 
 	resultPods := SanitizePods(pods, "n100", "abc")
 	resultPods = append(resultPods, SanitizePod(pod1, "n100", "abc"))
@@ -52,7 +52,7 @@ func TestSanitizePods(t *testing.T) {
 }
 
 func TestSanitizeLabels(t *testing.T) {
-	oldNode := clustersnapshot.NodeResourceInfo{Node: BuildTestNode("ng1-1", 1000, 1000)}
+	oldNode := &clustersnapshot.NodeResourceInfo{Node: BuildTestNode("ng1-1", 1000, 1000)}
 	oldNode.Node.Labels = map[string]string{
 		apiv1.LabelHostname: "abc",
 		"x":                 "y",

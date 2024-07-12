@@ -25,33 +25,33 @@ import (
 	. "k8s.io/autoscaler/cluster-autoscaler/utils/test"
 )
 
-func createTestNodesWithPrefix(prefix string, n int) []NodeResourceInfo {
-	nodes := make([]NodeResourceInfo, n, n)
+func createTestNodesWithPrefix(prefix string, n int) []*NodeResourceInfo {
+	nodes := make([]*NodeResourceInfo, n, n)
 	for i := 0; i < n; i++ {
 		node := BuildTestNode(fmt.Sprintf("%s-%d", prefix, i), 2000, 2000000)
 		SetNodeReadyState(node, true, time.Time{})
-		nodes[i] = NodeResourceInfo{Node: node}
+		nodes[i] = &NodeResourceInfo{Node: node}
 	}
 	return nodes
 }
 
-func createTestNodes(n int) []NodeResourceInfo {
+func createTestNodes(n int) []*NodeResourceInfo {
 	return createTestNodesWithPrefix("n", n)
 }
 
-func createTestPodsWithPrefix(prefix string, n int) []PodResourceInfo {
-	pods := make([]PodResourceInfo, n, n)
+func createTestPodsWithPrefix(prefix string, n int) []*PodResourceInfo {
+	pods := make([]*PodResourceInfo, n, n)
 	for i := 0; i < n; i++ {
-		pods[i] = PodResourceInfo{Pod: BuildTestPod(fmt.Sprintf("%s-%d", prefix, i), 1000, 2000000)}
+		pods[i] = &PodResourceInfo{Pod: BuildTestPod(fmt.Sprintf("%s-%d", prefix, i), 1000, 2000000)}
 	}
 	return pods
 }
 
-func createTestPods(n int) []PodResourceInfo {
+func createTestPods(n int) []*PodResourceInfo {
 	return createTestPodsWithPrefix("p", n)
 }
 
-func assignPodsToNodes(pods []PodResourceInfo, nodes []NodeResourceInfo) {
+func assignPodsToNodes(pods []*PodResourceInfo, nodes []*NodeResourceInfo) {
 	if len(nodes) == 0 {
 		return
 	}
@@ -187,8 +187,8 @@ func BenchmarkForkAddRevert(b *testing.B) {
 					err = clusterSnapshot.AddPod(pod, pod.Pod.Spec.NodeName)
 					assert.NoError(b, err)
 				}
-				tmpNode1 := NodeResourceInfo{Node: BuildTestNode("tmp-1", 2000, 2000000)}
-				tmpNode2 := NodeResourceInfo{Node: BuildTestNode("tmp-2", 2000, 2000000)}
+				tmpNode1 := &NodeResourceInfo{Node: BuildTestNode("tmp-1", 2000, 2000000)}
+				tmpNode2 := &NodeResourceInfo{Node: BuildTestNode("tmp-2", 2000, 2000000)}
 				b.ResetTimer()
 				b.Run(fmt.Sprintf("%s: ForkAddRevert (%d nodes, %d pods)", snapshotName, ntc, ptc), func(b *testing.B) {
 					for i := 0; i < b.N; i++ {
