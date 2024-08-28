@@ -245,6 +245,10 @@ func TestScaleUp(t *testing.T) {
 
 			prPods, err := pods.PodsForProvisioningRequest(tc.provReqToScaleUp)
 			assert.NoError(t, err)
+			var pods []*clustersnapshot.PodResourceInfo
+			for _, pod := range prPods {
+				pods = append(pods, &clustersnapshot.PodResourceInfo{Pod: pod})
+			}
 
 			onScaleUpFunc := func(name string, n int) error {
 				if tc.scaleUpResult == status.ScaleUpSuccessful {
@@ -254,7 +258,7 @@ func TestScaleUp(t *testing.T) {
 			}
 			orchestrator, nodeInfos := setupTest(t, allNodes, tc.provReqs, onScaleUpFunc, tc.autoprovisioning)
 
-			st, err := orchestrator.ScaleUp(prPods, []*apiv1.Node{}, []*appsv1.DaemonSet{}, nodeInfos, false)
+			st, err := orchestrator.ScaleUp(pods, []*apiv1.Node{}, []*appsv1.DaemonSet{}, nodeInfos, false)
 			if !tc.err {
 				assert.NoError(t, err)
 				if tc.scaleUpResult != st.Result && len(st.PodsRemainUnschedulable) > 0 {

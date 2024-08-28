@@ -17,6 +17,7 @@ limitations under the License.
 package orchestrator
 
 import (
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,13 +45,13 @@ func TestWrapperScaleUp(t *testing.T) {
 		provReqOrchestrator: &fakeScaleUp{provisioningRequestErrorMsg},
 		podsOrchestrator:    &fakeScaleUp{regularPodsErrorMsg},
 	}
-	regularPods := []*apiv1.Pod{
-		BuildTestPod("pod-1", 1, 100),
-		BuildTestPod("pod-2", 1, 100),
+	regularPods := []*clustersnapshot.PodResourceInfo{
+		{Pod: BuildTestPod("pod-1", 1, 100)},
+		{Pod: BuildTestPod("pod-2", 1, 100)},
 	}
-	provReqPods := []*apiv1.Pod{
-		BuildTestPod("pr-pod-1", 1, 100),
-		BuildTestPod("pr-pod-2", 1, 100),
+	provReqPods := []*clustersnapshot.PodResourceInfo{
+		{Pod: BuildTestPod("pr-pod-1", 1, 100)},
+		{Pod: BuildTestPod("pr-pod-2", 1, 100)},
 	}
 	for _, pod := range provReqPods {
 		pod.Annotations[v1.ProvisioningRequestPodAnnotationKey] = "true"
@@ -67,7 +68,7 @@ type fakeScaleUp struct {
 }
 
 func (f *fakeScaleUp) ScaleUp(
-	unschedulablePods []*apiv1.Pod,
+	unschedulablePods []*clustersnapshot.PodResourceInfo,
 	nodes []*apiv1.Node,
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,

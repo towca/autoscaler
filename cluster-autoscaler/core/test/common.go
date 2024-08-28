@@ -324,12 +324,12 @@ type MockAutoprovisioningNodeGroupListProcessor struct {
 
 // Process extends the list of node groups
 func (p *MockAutoprovisioningNodeGroupListProcessor) Process(context *context.AutoscalingContext, nodeGroups []cloudprovider.NodeGroup, nodeInfos map[string]*schedulerframework.NodeInfo,
-	unschedulablePods []*apiv1.Pod,
+	unschedulablePods []*clustersnapshot.PodResourceInfo,
 ) ([]cloudprovider.NodeGroup, map[string]*schedulerframework.NodeInfo, error) {
 	machines, err := context.CloudProvider.GetAvailableMachineTypes()
 	assert.NoError(p.T, err)
 
-	bestLabels := labels.BestLabelSet(unschedulablePods)
+	bestLabels := labels.BestLabelSet(clustersnapshot.ToPods(unschedulablePods))
 	for _, machineType := range machines {
 		nodeGroup, err := context.CloudProvider.NewNodeGroup(machineType, bestLabels, map[string]string{}, []apiv1.Taint{}, map[string]resource.Quantity{})
 		assert.NoError(p.T, err)

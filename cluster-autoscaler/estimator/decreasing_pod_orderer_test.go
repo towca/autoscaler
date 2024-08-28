@@ -17,18 +17,18 @@ limitations under the License.
 package estimator
 
 import (
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/test"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 func TestPodPriorityProcessor(t *testing.T) {
-	pg1 := PodEquivalenceGroup{Pods: []*v1.Pod{test.BuildTestPod("p1", 1, 1)}}
-	pg2 := PodEquivalenceGroup{Pods: []*v1.Pod{test.BuildTestPod("p2", 2, 1)}}
-	pg3 := PodEquivalenceGroup{Pods: []*v1.Pod{test.BuildTestPod("p3", 2, 100)}}
+	pg1 := PodEquivalenceGroup{Pods: []*clustersnapshot.PodResourceInfo{{Pod: test.BuildTestPod("p1", 1, 1)}}}
+	pg2 := PodEquivalenceGroup{Pods: []*clustersnapshot.PodResourceInfo{{Pod: test.BuildTestPod("p2", 2, 1)}}}
+	pg3 := PodEquivalenceGroup{Pods: []*clustersnapshot.PodResourceInfo{{Pod: test.BuildTestPod("p3", 2, 100)}}}
 	node := makeNode(4, 600, 10, "node1", "zone-sun")
 	testCases := map[string]struct {
 		inputPodsEquivalentGroup    []PodEquivalenceGroup

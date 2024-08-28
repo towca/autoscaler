@@ -38,11 +38,11 @@ var AvailableEstimators = []string{BinpackingEstimatorName}
 // PodEquivalenceGroup represents a group of pods, which have the same scheduling
 // requirements and are managed by the same controller.
 type PodEquivalenceGroup struct {
-	Pods []*apiv1.Pod
+	Pods []*clustersnapshot.PodResourceInfo
 }
 
 // Exemplar returns an example pod from the group.
-func (p *PodEquivalenceGroup) Exemplar() *apiv1.Pod {
+func (p *PodEquivalenceGroup) Exemplar() *clustersnapshot.PodResourceInfo {
 	if len(p.Pods) == 0 {
 		return nil
 	}

@@ -17,6 +17,7 @@ limitations under the License.
 package equivalence
 
 import (
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"reflect"
 
 	"k8s.io/autoscaler/cluster-autoscaler/utils"
@@ -30,14 +31,14 @@ import (
 
 // PodGroup contains a group of pods that are equivalent in terms of schedulability.
 type PodGroup struct {
-	Pods              []*apiv1.Pod
+	Pods              []*clustersnapshot.PodResourceInfo
 	SchedulingErrors  map[string]status.Reasons
 	SchedulableGroups []string
 	Schedulable       bool
 }
 
 // BuildPodGroups prepares pod groups with equivalent scheduling properties.
-func BuildPodGroups(pods []*apiv1.Pod) []*PodGroup {
+func BuildPodGroups(pods []*clustersnapshot.PodResourceInfo) []*PodGroup {
 	podEquivalenceGroups := []*PodGroup{}
 	for _, pods := range groupPodsBySchedulingProperties(pods) {
 		podEquivalenceGroups = append(podEquivalenceGroups, &PodGroup{
@@ -52,28 +53,28 @@ func BuildPodGroups(pods []*apiv1.Pod) []*PodGroup {
 type equivalenceGroupId int
 type equivalenceGroup struct {
 	id           equivalenceGroupId
-	representant *apiv1.Pod
+	representant *clustersnapshot.PodResourceInfo
 }
 
 const maxEquivalenceGroupsByController = 10
 
 // groupPodsBySchedulingProperties groups pods based on scheduling properties. Group ID is meaningless.
 // TODO(x13n): refactor this to have shared logic with PodSchedulableMap.
-func groupPodsBySchedulingProperties(pods []*apiv1.Pod) map[equivalenceGroupId][]*apiv1.Pod {
-	podEquivalenceGroups := map[equivalenceGroupId][]*apiv1.Pod{}
+func groupPodsBySchedulingProperties(pods []*clustersnapshot.PodResourceInfo) map[equivalenceGroupId][]*clustersnapshot.PodResourceInfo {
+	podEquivalenceGroups := map[equivalenceGroupId][]*clustersnapshot.PodResourceInfo{}
 	equivalenceGroupsByController := make(map[types.UID][]equivalenceGroup)
 
 	var nextGroupId equivalenceGroupId
 	for _, pod := range pods {
-		controllerRef := drain.ControllerRef(pod)
-		if controllerRef == nil || pod_utils.IsDaemonSetPod(pod) {
-			podEquivalenceGroups[nextGroupId] = []*apiv1.Pod{pod}
+		controllerRef := drain.ControllerRef(pod.Pod)
+		if controllerRef == nil || pod_utils.IsDaemonSetPod(pod.Pod) {
+			podEquivalenceGroups[nextGroupId] = []*clustersnapshot.PodResourceInfo{pod}
 			nextGroupId++
 			continue
 		}
 
 		egs := equivalenceGroupsByController[controllerRef.UID]
-		if gid := match(egs, pod); gid != nil {
+		if gid := match(egs, pod.Pod); gid != nil {
 			podEquivalenceGroups[*gid] = append(podEquivalenceGroups[*gid], pod)
 			continue
 		}

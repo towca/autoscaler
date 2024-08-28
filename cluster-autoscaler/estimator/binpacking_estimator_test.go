@@ -33,9 +33,9 @@ import (
 )
 
 func makePodEquivalenceGroup(pod *apiv1.Pod, podCount int) PodEquivalenceGroup {
-	pods := []*apiv1.Pod{}
+	var pods []*clustersnapshot.PodResourceInfo
 	for i := 0; i < podCount; i++ {
-		pods = append(pods, pod)
+		pods = append(pods, &clustersnapshot.PodResourceInfo{Pod: pod})
 	}
 	return PodEquivalenceGroup{
 		Pods: pods,
@@ -170,7 +170,7 @@ func TestBinpackingEstimate(t *testing.T) {
 			maxNodes:            5,
 			expectNodeCount:     5,
 			expectPodCount:      10,
-			expectProcessedPods: highResourcePodGroup.Pods,
+			expectProcessedPods: clustersnapshot.ToPods(highResourcePodGroup.Pods),
 		},
 		{
 			name:       "hostname topology spreading with maxSkew=2 forces 2 pods/node",

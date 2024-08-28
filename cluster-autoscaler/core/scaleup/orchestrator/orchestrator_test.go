@@ -18,6 +18,7 @@ package orchestrator
 
 import (
 	"fmt"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -53,7 +54,6 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
-	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes/fake"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 
@@ -976,9 +976,9 @@ func runSimpleScaleUpTest(t *testing.T, config *ScaleUpTestConfig) *ScaleUpTestR
 	for i, p := range config.Pods {
 		pods[i] = buildTestPod(p)
 	}
-	extraPods := make([]*apiv1.Pod, len(config.ExtraPods))
+	extraPods := make([]*clustersnapshot.PodResourceInfo, len(config.ExtraPods))
 	for i, p := range config.ExtraPods {
-		extraPods[i] = buildTestPod(p)
+		extraPods[i] = &clustersnapshot.PodResourceInfo{Pod: buildTestPod(p)}
 	}
 	podLister := kube_util.NewTestPodLister(pods)
 	listers := kube_util.NewListerRegistry(nil, nil, podLister, nil, nil, nil, nil, nil, nil)
@@ -1158,12 +1158,12 @@ func TestScaleUpUnhealthy(t *testing.T) {
 	nodeInfos, _ := nodeinfosprovider.NewDefaultTemplateNodeInfoProvider(nil, false).Process(&context, nodes, []*appsv1.DaemonSet{}, taints.TaintConfig{}, now)
 	clusterState := clusterstate.NewClusterStateRegistry(provider, clusterstate.ClusterStateRegistryConfig{}, context.LogRecorder, NewBackoff(), nodegroupconfig.NewDefaultNodeGroupConfigProcessor(config.NodeGroupAutoscalingOptions{MaxNodeProvisionTime: 15 * time.Minute}), asyncnodegroups.NewDefaultAsyncNodeGroupStateChecker())
 	clusterState.UpdateNodes(nodes, nodeInfos, time.Now())
-	p3 := BuildTestPod("p-new", 550, 0)
+	p3 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p-new", 550, 0)}
 
 	processors := NewTestProcessors(&context)
 	suOrchestrator := New()
 	suOrchestrator.Initialize(&context, processors, clusterState, newEstimatorBuilder(), taints.TaintConfig{})
-	scaleUpStatus, err := suOrchestrator.ScaleUp([]*apiv1.Pod{p3}, nodes, []*appsv1.DaemonSet{}, nodeInfos, false)
+	scaleUpStatus, err := suOrchestrator.ScaleUp([]*clustersnapshot.PodResourceInfo{p3}, nodes, []*appsv1.DaemonSet{}, nodeInfos, false)
 
 	assert.NoError(t, err)
 	// Node group is unhealthy.
@@ -1204,7 +1204,7 @@ func TestBinpackingLimiter(t *testing.T) {
 	clusterState := clusterstate.NewClusterStateRegistry(provider, clusterstate.ClusterStateRegistryConfig{}, context.LogRecorder, NewBackoff(), nodegroupconfig.NewDefaultNodeGroupConfigProcessor(config.NodeGroupAutoscalingOptions{MaxNodeProvisionTime: 15 * time.Minute}), asyncnodegroups.NewDefaultAsyncNodeGroupStateChecker())
 	clusterState.UpdateNodes(nodes, nodeInfos, time.Now())
 
-	extraPod := BuildTestPod("p-new", 500, 0)
+	extraPod := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p-new", 500, 0)}
 
 	processors := NewTestProcessors(&context)
 
@@ -1217,7 +1217,7 @@ func TestBinpackingLimiter(t *testing.T) {
 	expander := NewMockRepotingStrategy(t, nil)
 	context.ExpanderStrategy = expander
 
-	scaleUpStatus, err := suOrchestrator.ScaleUp([]*apiv1.Pod{extraPod}, nodes, []*appsv1.DaemonSet{}, nodeInfos, false)
+	scaleUpStatus, err := suOrchestrator.ScaleUp([]*clustersnapshot.PodResourceInfo{extraPod}, nodes, []*appsv1.DaemonSet{}, nodeInfos, false)
 	processors.ScaleUpStatusProcessor.Process(&context, scaleUpStatus)
 	assert.NoError(t, err)
 	assert.True(t, scaleUpStatus.WasSuccessful())
@@ -1258,12 +1258,12 @@ func TestScaleUpNoHelp(t *testing.T) {
 	nodeInfos, _ := nodeinfosprovider.NewDefaultTemplateNodeInfoProvider(nil, false).Process(&context, nodes, []*appsv1.DaemonSet{}, taints.TaintConfig{}, now)
 	clusterState := clusterstate.NewClusterStateRegistry(provider, clusterstate.ClusterStateRegistryConfig{}, context.LogRecorder, NewBackoff(), nodegroupconfig.NewDefaultNodeGroupConfigProcessor(config.NodeGroupAutoscalingOptions{MaxNodeProvisionTime: 15 * time.Minute}), asyncnodegroups.NewDefaultAsyncNodeGroupStateChecker())
 	clusterState.UpdateNodes(nodes, nodeInfos, time.Now())
-	p3 := BuildTestPod("p-new", 500, 0)
+	p3 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p-new", 500, 0)}
 
 	processors := NewTestProcessors(&context)
 	suOrchestrator := New()
 	suOrchestrator.Initialize(&context, processors, clusterState, newEstimatorBuilder(), taints.TaintConfig{})
-	scaleUpStatus, err := suOrchestrator.ScaleUp([]*apiv1.Pod{p3}, nodes, []*appsv1.DaemonSet{}, nodeInfos, false)
+	scaleUpStatus, err := suOrchestrator.ScaleUp([]*clustersnapshot.PodResourceInfo{p3}, nodes, []*appsv1.DaemonSet{}, nodeInfos, false)
 	processors.ScaleUpStatusProcessor.Process(&context, scaleUpStatus)
 
 	assert.NoError(t, err)
@@ -1292,9 +1292,9 @@ func (p *constNodeGroupSetProcessor) BalanceScaleUpBetweenGroups(_ *context.Auto
 func (p *constNodeGroupSetProcessor) CleanUp() {}
 
 func TestComputeSimilarNodeGroups(t *testing.T) {
-	podGroup1 := estimator.PodEquivalenceGroup{Pods: []*v1.Pod{BuildTestPod("p1", 100, 1000)}}
-	podGroup2 := estimator.PodEquivalenceGroup{Pods: []*v1.Pod{BuildTestPod("p2", 100, 1000)}}
-	podGroup3 := estimator.PodEquivalenceGroup{Pods: []*v1.Pod{BuildTestPod("p3", 100, 1000)}}
+	podGroup1 := estimator.PodEquivalenceGroup{Pods: []*clustersnapshot.PodResourceInfo{{Pod: BuildTestPod("p1", 100, 1000)}}}
+	podGroup2 := estimator.PodEquivalenceGroup{Pods: []*clustersnapshot.PodResourceInfo{{Pod: BuildTestPod("p2", 100, 1000)}}}
+	podGroup3 := estimator.PodEquivalenceGroup{Pods: []*clustersnapshot.PodResourceInfo{{Pod: BuildTestPod("p3", 100, 1000)}}}
 
 	testCases := []struct {
 		name                  string
@@ -1477,9 +1477,9 @@ func TestScaleUpBalanceGroups(t *testing.T) {
 	clusterState := clusterstate.NewClusterStateRegistry(provider, clusterstate.ClusterStateRegistryConfig{}, context.LogRecorder, NewBackoff(), nodegroupconfig.NewDefaultNodeGroupConfigProcessor(config.NodeGroupAutoscalingOptions{MaxNodeProvisionTime: 15 * time.Minute}), asyncnodegroups.NewDefaultAsyncNodeGroupStateChecker())
 	clusterState.UpdateNodes(nodes, nodeInfos, time.Now())
 
-	pods := make([]*apiv1.Pod, 0)
+	pods := make([]*clustersnapshot.PodResourceInfo, 0)
 	for i := 0; i < 2; i++ {
-		pods = append(pods, BuildTestPod(fmt.Sprintf("test-pod-%v", i), 80, 0))
+		pods = append(pods, &clustersnapshot.PodResourceInfo{Pod: BuildTestPod(fmt.Sprintf("test-pod-%v", i), 80, 0)})
 	}
 
 	processors := NewTestProcessors(&context)
@@ -1506,7 +1506,7 @@ func TestScaleUpAutoprovisionedNodeGroup(t *testing.T) {
 	createdGroups := make(chan string, 10)
 	expandedGroups := make(chan string, 10)
 
-	p1 := BuildTestPod("p1", 80, 0)
+	p1 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p1", 80, 0)}
 
 	fakeClient := &fake.Clientset{}
 
@@ -1547,7 +1547,7 @@ func TestScaleUpAutoprovisionedNodeGroup(t *testing.T) {
 
 	suOrchestrator := New()
 	suOrchestrator.Initialize(&context, processors, clusterState, newEstimatorBuilder(), taints.TaintConfig{})
-	scaleUpStatus, err := suOrchestrator.ScaleUp([]*apiv1.Pod{p1}, nodes, []*appsv1.DaemonSet{}, nodeInfos, false)
+	scaleUpStatus, err := suOrchestrator.ScaleUp([]*clustersnapshot.PodResourceInfo{p1}, nodes, []*appsv1.DaemonSet{}, nodeInfos, false)
 	assert.NoError(t, err)
 	assert.True(t, scaleUpStatus.WasSuccessful())
 	assert.Equal(t, "autoprovisioned-T1", utils.GetStringFromChan(createdGroups))
@@ -1558,9 +1558,9 @@ func TestScaleUpBalanceAutoprovisionedNodeGroups(t *testing.T) {
 	createdGroups := make(chan string, 10)
 	expandedGroups := make(chan string, 10)
 
-	p1 := BuildTestPod("p1", 80, 0)
-	p2 := BuildTestPod("p2", 80, 0)
-	p3 := BuildTestPod("p3", 80, 0)
+	p1 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p1", 80, 0)}
+	p2 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p2", 80, 0)}
+	p3 := &clustersnapshot.PodResourceInfo{Pod: BuildTestPod("p3", 80, 0)}
 
 	fakeClient := &fake.Clientset{}
 
@@ -1602,7 +1602,7 @@ func TestScaleUpBalanceAutoprovisionedNodeGroups(t *testing.T) {
 
 	suOrchestrator := New()
 	suOrchestrator.Initialize(&context, processors, clusterState, newEstimatorBuilder(), taints.TaintConfig{})
-	scaleUpStatus, err := suOrchestrator.ScaleUp([]*apiv1.Pod{p1, p2, p3}, nodes, []*appsv1.DaemonSet{}, nodeInfos, false)
+	scaleUpStatus, err := suOrchestrator.ScaleUp([]*clustersnapshot.PodResourceInfo{p1, p2, p3}, nodes, []*appsv1.DaemonSet{}, nodeInfos, false)
 	assert.NoError(t, err)
 	assert.True(t, scaleUpStatus.WasSuccessful())
 	assert.Equal(t, "autoprovisioned-T1", utils.GetStringFromChan(createdGroups))
@@ -1678,7 +1678,7 @@ func TestScaleupAsyncNodeGroupsEnabled(t *testing.T) {
 
 	testCases := []struct {
 		upcomingNodeGroupsNames []string
-		podsToAdd               []*v1.Pod
+		podsToAdd               []*clustersnapshot.PodResourceInfo
 		isUpcomingMockMap       map[string]bool
 		machineTypes            []string
 		machineTemplates        map[string]*schedulerframework.NodeInfo
@@ -1687,7 +1687,7 @@ func TestScaleupAsyncNodeGroupsEnabled(t *testing.T) {
 	}{
 		{
 			upcomingNodeGroupsNames: []string{"T1"},
-			podsToAdd:               []*v1.Pod{BuildTestPod("p1", 80, 0), BuildTestPod("p2", 80, 0)},
+			podsToAdd:               []*clustersnapshot.PodResourceInfo{{Pod: BuildTestPod("p1", 80, 0)}, {Pod: BuildTestPod("p2", 80, 0)}},
 			isUpcomingMockMap:       map[string]bool{"autoprovisioned-T1": true},
 			machineTypes:            []string{"T1"},
 			machineTemplates:        map[string]*schedulerframework.NodeInfo{"T1": ti1},
@@ -1696,7 +1696,7 @@ func TestScaleupAsyncNodeGroupsEnabled(t *testing.T) {
 		},
 		{
 			upcomingNodeGroupsNames: []string{},
-			podsToAdd:               []*v1.Pod{BuildTestPod("p1", 80, 0)},
+			podsToAdd:               []*clustersnapshot.PodResourceInfo{{Pod: BuildTestPod("p1", 80, 0)}},
 			isUpcomingMockMap:       map[string]bool{},
 			machineTypes:            []string{"T1"},
 			machineTemplates:        map[string]*schedulerframework.NodeInfo{"T1": ti1},
@@ -1705,7 +1705,7 @@ func TestScaleupAsyncNodeGroupsEnabled(t *testing.T) {
 		},
 		{
 			upcomingNodeGroupsNames: []string{"T1"},
-			podsToAdd:               []*v1.Pod{BuildTestPod("p3", 0, 100), BuildTestPod("p2", 0, 100)},
+			podsToAdd:               []*clustersnapshot.PodResourceInfo{{Pod: BuildTestPod("p3", 0, 100)}, {Pod: BuildTestPod("p2", 0, 100)}},
 			isUpcomingMockMap:       map[string]bool{"autoprovisioned-T1": true},
 			machineTypes:            []string{"T1", "T2"},
 			machineTemplates:        map[string]*schedulerframework.NodeInfo{"T1": ti1, "T2": ti2},

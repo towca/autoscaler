@@ -17,9 +17,9 @@ limitations under the License.
 package nodegroups
 
 import (
-	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
 	"k8s.io/autoscaler/cluster-autoscaler/context"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
@@ -27,7 +27,7 @@ import (
 type NodeGroupListProcessor interface {
 	Process(context *context.AutoscalingContext, nodeGroups []cloudprovider.NodeGroup,
 		nodeInfos map[string]*schedulerframework.NodeInfo,
-		unschedulablePods []*apiv1.Pod) ([]cloudprovider.NodeGroup, map[string]*schedulerframework.NodeInfo, error)
+		unschedulablePods []*clustersnapshot.PodResourceInfo) ([]cloudprovider.NodeGroup, map[string]*schedulerframework.NodeInfo, error)
 	CleanUp()
 }
 
@@ -42,7 +42,7 @@ func NewDefaultNodeGroupListProcessor() NodeGroupListProcessor {
 
 // Process processes lists of unschedulable and scheduled pods before scaling of the cluster.
 func (p *NoOpNodeGroupListProcessor) Process(context *context.AutoscalingContext, nodeGroups []cloudprovider.NodeGroup, nodeInfos map[string]*schedulerframework.NodeInfo,
-	unschedulablePods []*apiv1.Pod) ([]cloudprovider.NodeGroup, map[string]*schedulerframework.NodeInfo, error) {
+	unschedulablePods []*clustersnapshot.PodResourceInfo) ([]cloudprovider.NodeGroup, map[string]*schedulerframework.NodeInfo, error) {
 	return nodeGroups, nodeInfos, nil
 }
 

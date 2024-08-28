@@ -18,6 +18,7 @@ package checkcapacity
 
 import (
 	"fmt"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -65,7 +66,7 @@ func (o *checkCapacityProvClass) Initialize(
 
 // Provision return if there is capacity in the cluster for pods from ProvisioningRequest.
 func (o *checkCapacityProvClass) Provision(
-	unschedulablePods []*apiv1.Pod,
+	unschedulablePods []*clustersnapshot.PodResourceInfo,
 	nodes []*apiv1.Node,
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
@@ -74,7 +75,7 @@ func (o *checkCapacityProvClass) Provision(
 		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
 	}
 
-	prs := provreqclient.ProvisioningRequestsForPods(o.client, unschedulablePods)
+	prs := provreqclient.ProvisioningRequestsForPods(o.client, clustersnapshot.ToPods(unschedulablePods))
 	prs = provreqclient.FilterOutProvisioningClass(prs, v1.ProvisioningClassCheckCapacity)
 	if len(prs) == 0 {
 		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
@@ -95,9 +96,9 @@ func (o *checkCapacityProvClass) Provision(
 }
 
 // Assuming that all unschedulable pods comes from one ProvisioningRequest.
-func (o *checkCapacityProvClass) checkcapacity(unschedulablePods []*apiv1.Pod, provReq *provreqwrapper.ProvisioningRequest) (capacityAvailable bool, err error) {
+func (o *checkCapacityProvClass) checkcapacity(unschedulablePods []*clustersnapshot.PodResourceInfo, provReq *provreqwrapper.ProvisioningRequest) (capacityAvailable bool, err error) {
 	capacityAvailable = true
-	st, _, err := o.injector.TrySchedulePods(o.context.ClusterSnapshot, unschedulablePods, scheduling.ScheduleAnywhere, true)
+	st, _, err := o.injector.TrySchedulePods(o.context.ClusterSnapshot, clustersnapshot.ToPods(unschedulablePods), scheduling.ScheduleAnywhere, true)
 	if len(st) < len(unschedulablePods) || err != nil {
 		conditions.AddOrUpdateCondition(provReq, v1.Provisioned, metav1.ConditionFalse, conditions.CapacityIsNotFoundReason, "Capacity is not found, CA will try to find it later.", metav1.Now())
 		capacityAvailable = false

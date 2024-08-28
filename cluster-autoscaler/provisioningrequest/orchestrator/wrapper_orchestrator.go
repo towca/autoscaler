@@ -27,6 +27,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/estimator"
 	ca_processors "k8s.io/autoscaler/cluster-autoscaler/processors"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/status"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/errors"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/taints"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
@@ -64,7 +65,7 @@ func (o *WrapperOrchestrator) Initialize(
 
 // ScaleUp run scaleUp function for regular pods of pods from ProvisioningRequest.
 func (o *WrapperOrchestrator) ScaleUp(
-	unschedulablePods []*apiv1.Pod,
+	unschedulablePods []*clustersnapshot.PodResourceInfo,
 	nodes []*apiv1.Node,
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
@@ -85,7 +86,7 @@ func (o *WrapperOrchestrator) ScaleUp(
 	return o.provReqOrchestrator.ScaleUp(provReqPods, nodes, daemonSets, nodeInfos, allOrNothing)
 }
 
-func splitOut(unschedulablePods []*apiv1.Pod) (provReqPods, regularPods []*apiv1.Pod) {
+func splitOut(unschedulablePods []*clustersnapshot.PodResourceInfo) (provReqPods, regularPods []*clustersnapshot.PodResourceInfo) {
 	for _, pod := range unschedulablePods {
 		if _, ok := pod.Annotations[v1.ProvisioningRequestPodAnnotationKey]; ok {
 			provReqPods = append(provReqPods, pod)

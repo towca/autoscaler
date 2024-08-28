@@ -85,7 +85,7 @@ func (o *ScaleUpOrchestrator) Initialize(
 // an unexpected error occurred. Assumes that all nodes in the cluster are ready
 // and in sync with instance groups.
 func (o *ScaleUpOrchestrator) ScaleUp(
-	unschedulablePods []*apiv1.Pod,
+	unschedulablePods []*clustersnapshot.PodResourceInfo,
 	nodes []*apiv1.Node,
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
@@ -579,7 +579,7 @@ func (o *ScaleUpOrchestrator) SchedulablePodGroups(
 	var schedulablePodGroups []estimator.PodEquivalenceGroup
 	for _, eg := range podEquivalenceGroups {
 		samplePod := eg.Pods[0]
-		if err := o.autoscalingContext.PredicateChecker.CheckPredicates(o.autoscalingContext.ClusterSnapshot, samplePod, nodeInfo.Node().Name); err == nil {
+		if err := o.autoscalingContext.PredicateChecker.CheckPredicates(o.autoscalingContext.ClusterSnapshot, samplePod.Pod, nodeInfo.Node().Name); err == nil {
 			// Add pods to option.
 			schedulablePodGroups = append(schedulablePodGroups, estimator.PodEquivalenceGroup{
 				Pods: eg.Pods,
@@ -758,10 +758,10 @@ func (o *ScaleUpOrchestrator) ComputeSimilarNodeGroups(
 func matchingSchedulablePodGroups(podGroups []estimator.PodEquivalenceGroup, similarPodGroups []estimator.PodEquivalenceGroup) bool {
 	schedulableSamplePods := make(map[*apiv1.Pod]bool)
 	for _, podGroup := range similarPodGroups {
-		schedulableSamplePods[podGroup.Exemplar()] = true
+		schedulableSamplePods[podGroup.Exemplar().Pod] = true
 	}
 	for _, podGroup := range podGroups {
-		if _, found := schedulableSamplePods[podGroup.Exemplar()]; !found {
+		if _, found := schedulableSamplePods[podGroup.Exemplar().Pod]; !found {
 			return false
 		}
 	}
@@ -801,7 +801,7 @@ func GetRemainingPods(egs []*equivalence.PodGroup, skipped map[string]status.Rea
 		}
 		for _, pod := range eg.Pods {
 			noScaleUpInfo := status.NoScaleUpInfo{
-				Pod:                pod,
+				Pod:                pod.Pod,
 				RejectedNodeGroups: eg.SchedulingErrors,
 				SkippedNodeGroups:  skipped,
 			}
@@ -819,7 +819,7 @@ func GetPodsAwaitingEvaluation(egs []*equivalence.PodGroup, bestOption string) [
 		if eg.Schedulable {
 			if _, found := eg.SchedulingErrors[bestOption]; found {
 				// Schedulable, but not yet.
-				awaitsEvaluation = append(awaitsEvaluation, eg.Pods...)
+				awaitsEvaluation = append(awaitsEvaluation, clustersnapshot.ToPods(eg.Pods)...)
 			}
 		}
 	}

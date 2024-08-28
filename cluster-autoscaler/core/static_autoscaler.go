@@ -135,22 +135,22 @@ func (callbacks *staticAutoscalerProcessorCallbacks) reset() {
 
 // NewStaticAutoscaler creates an instance of Autoscaler filled with provided parameters
 func NewStaticAutoscaler(
-		opts config.AutoscalingOptions,
-		predicateChecker predicatechecker.PredicateChecker,
-		clusterSnapshot clustersnapshot.ClusterSnapshot,
-		autoscalingKubeClients *context.AutoscalingKubeClients,
-		processors *ca_processors.AutoscalingProcessors,
-		loopStartNotifier *loopstart.ObserversList,
-		cloudProvider cloudprovider.CloudProvider,
-		expanderStrategy expander.Strategy,
-		estimatorBuilder estimator.EstimatorBuilder,
-		backoff backoff.Backoff,
-		debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter,
-		remainingPdbTracker pdb.RemainingPdbTracker,
-		scaleUpOrchestrator scaleup.Orchestrator,
-		deleteOptions options.NodeDeleteOptions,
-		drainabilityRules rules.Rules,
-		draProvider *dynamicresources.Provider) *StaticAutoscaler {
+	opts config.AutoscalingOptions,
+	predicateChecker predicatechecker.PredicateChecker,
+	clusterSnapshot clustersnapshot.ClusterSnapshot,
+	autoscalingKubeClients *context.AutoscalingKubeClients,
+	processors *ca_processors.AutoscalingProcessors,
+	loopStartNotifier *loopstart.ObserversList,
+	cloudProvider cloudprovider.CloudProvider,
+	expanderStrategy expander.Strategy,
+	estimatorBuilder estimator.EstimatorBuilder,
+	backoff backoff.Backoff,
+	debuggingSnapshotter debuggingsnapshot.DebuggingSnapshotter,
+	remainingPdbTracker pdb.RemainingPdbTracker,
+	scaleUpOrchestrator scaleup.Orchestrator,
+	deleteOptions options.NodeDeleteOptions,
+	drainabilityRules rules.Rules,
+	draProvider *dynamicresources.Provider) *StaticAutoscaler {
 
 	clusterStateConfig := clusterstate.ClusterStateRegistryConfig{
 		MaxTotalUnreadyPercentage: opts.MaxTotalUnreadyPercentage,
@@ -591,7 +591,7 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 	} else {
 		scaleUpStart := preScaleUp()
 		// TODO(DRA): Stop casting to naked Pods after ScaleUp works on PodResourceInfos.
-		scaleUpStatus, typedErr = a.scaleUpOrchestrator.ScaleUp(clustersnapshot.ToPods(unschedulablePodsToHelp), readyNodes, daemonsets, nodeInfosForGroups, false)
+		scaleUpStatus, typedErr = a.scaleUpOrchestrator.ScaleUp(unschedulablePodsToHelp, readyNodes, daemonsets, nodeInfosForGroups, false)
 		if exit, err := postScaleUp(scaleUpStart); exit {
 			return err
 		}
@@ -644,7 +644,7 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 
 		scaleDownInCooldown := a.isScaleDownInCooldown(currentTime, scaleDownCandidates)
 		klog.V(4).Infof("Scale down status: lastScaleUpTime=%s lastScaleDownDeleteTime=%v "+
-				"lastScaleDownFailTime=%s scaleDownForbidden=%v scaleDownInCooldown=%v",
+			"lastScaleDownFailTime=%s scaleDownForbidden=%v scaleDownInCooldown=%v",
 			a.lastScaleUpTime, a.lastScaleDownDeleteTime, a.lastScaleDownFailTime,
 			a.processorCallbacks.disableScaleDownForLoop, scaleDownInCooldown)
 		metrics.UpdateScaleDownInCooldown(scaleDownInCooldown)
@@ -683,8 +683,8 @@ func (a *StaticAutoscaler) RunOnce(currentTime time.Time) caerrors.AutoscalerErr
 			}
 
 			if (scaleDownStatus.Result == scaledownstatus.ScaleDownNoNodeDeleted ||
-					scaleDownStatus.Result == scaledownstatus.ScaleDownNoUnneeded) &&
-					a.AutoscalingContext.AutoscalingOptions.MaxBulkSoftTaintCount != 0 {
+				scaleDownStatus.Result == scaledownstatus.ScaleDownNoUnneeded) &&
+				a.AutoscalingContext.AutoscalingOptions.MaxBulkSoftTaintCount != 0 {
 				taintableNodes := a.scaleDownPlanner.UnneededNodes()
 
 				// Make sure we are only cleaning taints from selected node groups.
@@ -750,9 +750,9 @@ func (a *StaticAutoscaler) isScaleDownInCooldown(currentTime time.Time, scaleDow
 		return scaleDownInCooldown
 	}
 	return scaleDownInCooldown ||
-			a.lastScaleUpTime.Add(a.ScaleDownDelayAfterAdd).After(currentTime) ||
-			a.lastScaleDownFailTime.Add(a.ScaleDownDelayAfterFailure).After(currentTime) ||
-			a.lastScaleDownDeleteTime.Add(a.ScaleDownDelayAfterDelete).After(currentTime)
+		a.lastScaleUpTime.Add(a.ScaleDownDelayAfterAdd).After(currentTime) ||
+		a.lastScaleDownFailTime.Add(a.ScaleDownDelayAfterFailure).After(currentTime) ||
+		a.lastScaleDownDeleteTime.Add(a.ScaleDownDelayAfterDelete).After(currentTime)
 }
 
 // Sets the target size of node groups to the current number of nodes in them
@@ -788,7 +788,7 @@ func fixNodeGroupSize(context *context.AutoscalingContext, clusterStateRegistry 
 
 // Removes unregistered nodes if needed. Returns true if anything was removed and error if such occurred.
 func (a *StaticAutoscaler) removeOldUnregisteredNodes(allUnregisteredNodes []clusterstate.UnregisteredNode, context *context.AutoscalingContext,
-		csr *clusterstate.ClusterStateRegistry, currentTime time.Time, logRecorder *utils.LogEventRecorder) (bool, error) {
+	csr *clusterstate.ClusterStateRegistry, currentTime time.Time, logRecorder *utils.LogEventRecorder) (bool, error) {
 
 	nodeGroups := a.nodeGroupsById()
 	nodesToDeleteByNodeGroupId := make(map[string][]clusterstate.UnregisteredNode)

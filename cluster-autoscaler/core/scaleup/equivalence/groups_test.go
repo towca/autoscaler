@@ -18,6 +18,7 @@ package equivalence
 
 import (
 	"fmt"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"testing"
 
 	. "k8s.io/autoscaler/cluster-autoscaler/utils/test"
@@ -67,56 +68,56 @@ func TestGroupSchedulablePodsForNode(t *testing.T) {
 	}
 
 	projectedSAVol := BuildServiceTokenProjectedVolumeSource("path")
-	p1 := BuildTestPod("p1", 1500, 200000)
-	p2_1 := BuildTestPod("p2_1", 3000, 200000)
+	p1 := buildTestPod("p1", 1500, 200000)
+	p2_1 := buildTestPod("p2_1", 3000, 200000)
 	p2_1.OwnerReferences = GenerateOwnerReferences(rc1.Name, "ReplicationController", "extensions/v1beta1", rc1.UID)
-	p2_2 := BuildTestPod("p2_2", 3000, 200000)
+	p2_2 := buildTestPod("p2_2", 3000, 200000)
 	p2_2.OwnerReferences = GenerateOwnerReferences(rc1.Name, "ReplicationController", "extensions/v1beta1", rc1.UID)
-	p3_1 := BuildTestPod("p3_1", 100, 200000)
+	p3_1 := buildTestPod("p3_1", 100, 200000)
 	p3_1.OwnerReferences = GenerateOwnerReferences(rc2.Name, "ReplicationController", "extensions/v1beta1", rc2.UID)
-	p3_2 := BuildTestPod("p3_2", 100, 200000)
+	p3_2 := buildTestPod("p3_2", 100, 200000)
 	p3_2.OwnerReferences = GenerateOwnerReferences(rc2.Name, "ReplicationController", "extensions/v1beta1", rc2.UID)
 	// Two pods with projected volume sources should be in the same equivalence group
-	p4_1 := BuildTestPod("p4_1", 100, 200000)
+	p4_1 := buildTestPod("p4_1", 100, 200000)
 	p4_1.OwnerReferences = GenerateOwnerReferences(rc3.Name, "ReplicationController", "extensions/v1beta1", rc3.UID)
 	p4_1.Spec.Volumes = []apiv1.Volume{{Name: "kube-api-access-nz94b", VolumeSource: apiv1.VolumeSource{Projected: projectedSAVol}}}
-	p4_2 := BuildTestPod("p4_2", 100, 200000)
+	p4_2 := buildTestPod("p4_2", 100, 200000)
 	p4_2.OwnerReferences = GenerateOwnerReferences(rc3.Name, "ReplicationController", "extensions/v1beta1", rc3.UID)
 	p4_2.Spec.Volumes = []apiv1.Volume{{Name: "kube-api-access-mo25i", VolumeSource: apiv1.VolumeSource{Projected: projectedSAVol}}}
 	// Two pods with flex volume sources should be in different equivalence groups
-	p5_1 := BuildTestPod("p5_1", 100, 200000)
+	p5_1 := buildTestPod("p5_1", 100, 200000)
 	p5_1.Spec.Volumes = []apiv1.Volume{{Name: "volume-nz94b", VolumeSource: apiv1.VolumeSource{FlexVolume: &apiv1.FlexVolumeSource{Driver: "testDriver"}}}}
 	p5_1.OwnerReferences = GenerateOwnerReferences(rc4.Name, "ReplicationController", "extensions/v1beta1", rc4.UID)
-	p5_2 := BuildTestPod("p5_2", 100, 200000)
+	p5_2 := buildTestPod("p5_2", 100, 200000)
 	p5_2.Spec.Volumes = []apiv1.Volume{{Name: "volume-mo25i", VolumeSource: apiv1.VolumeSource{FlexVolume: &apiv1.FlexVolumeSource{Driver: "testDriver"}}}}
 	p5_2.OwnerReferences = GenerateOwnerReferences(rc4.Name, "ReplicationController", "extensions/v1beta1", rc4.UID)
-	unschedulablePods := []*apiv1.Pod{p1, p2_1, p2_2, p3_1, p3_2, p4_1, p4_2, p5_1, p5_2}
+	unschedulablePods := []*clustersnapshot.PodResourceInfo{p1, p2_1, p2_2, p3_1, p3_2, p4_1, p4_2, p5_1, p5_2}
 
 	podGroups := groupPodsBySchedulingProperties(unschedulablePods)
 	assert.Equal(t, 6, len(podGroups))
 
 	wantedGroups := []struct {
-		pods  []*apiv1.Pod
+		pods  []*clustersnapshot.PodResourceInfo
 		found bool
 	}{
-		{pods: []*apiv1.Pod{p1}},
-		{pods: []*apiv1.Pod{p2_1, p2_2}},
-		{pods: []*apiv1.Pod{p3_1, p3_2}},
-		{pods: []*apiv1.Pod{p4_1, p4_2}},
-		{pods: []*apiv1.Pod{p5_1}},
-		{pods: []*apiv1.Pod{p5_2}},
+		{pods: []*clustersnapshot.PodResourceInfo{p1}},
+		{pods: []*clustersnapshot.PodResourceInfo{p2_1, p2_2}},
+		{pods: []*clustersnapshot.PodResourceInfo{p3_1, p3_2}},
+		{pods: []*clustersnapshot.PodResourceInfo{p4_1, p4_2}},
+		{pods: []*clustersnapshot.PodResourceInfo{p5_1}},
+		{pods: []*clustersnapshot.PodResourceInfo{p5_2}},
 	}
 
-	equal := func(a, b []*apiv1.Pod) bool {
+	equal := func(a, b []*clustersnapshot.PodResourceInfo) bool {
 		if len(a) != len(b) {
 			return false
 		}
 		ma := map[*apiv1.Pod]bool{}
 		for _, ea := range a {
-			ma[ea] = true
+			ma[ea.Pod] = true
 		}
 		for _, eb := range b {
-			if !ma[eb] {
+			if !ma[eb.Pod] {
 				return false
 			}
 		}
@@ -149,9 +150,9 @@ func TestEquivalenceGroupSizeLimiting(t *testing.T) {
 			UID:       "12345678-1234-1234-1234-123456789012",
 		},
 	}
-	pods := make([]*apiv1.Pod, 0, maxEquivalenceGroupsByController+1)
+	pods := make([]*clustersnapshot.PodResourceInfo, 0, maxEquivalenceGroupsByController+1)
 	for i := 0; i < maxEquivalenceGroupsByController+1; i += 1 {
-		p := BuildTestPod(fmt.Sprintf("p%d", i), 3000, 200000)
+		p := buildTestPod(fmt.Sprintf("p%d", i), 3000, 200000)
 		p.OwnerReferences = GenerateOwnerReferences(rc.Name, "ReplicationController", "extensions/v1beta1", rc.UID)
 		label := fmt.Sprintf("l%d", i)
 		if i > maxEquivalenceGroupsByController {
@@ -176,11 +177,15 @@ func TestEquivalenceGroupIgnoresDaemonSets(t *testing.T) {
 			UID:       "12345678-1234-1234-1234-123456789012",
 		},
 	}
-	pods := make([]*apiv1.Pod, 2)
-	pods[0] = BuildTestPod("p1", 3000, 200000)
+	pods := make([]*clustersnapshot.PodResourceInfo, 2)
+	pods[0] = buildTestPod("p1", 3000, 200000)
 	pods[0].OwnerReferences = GenerateOwnerReferences(ds.Name, "DaemonSet", "apps/v1", ds.UID)
-	pods[1] = BuildTestPod("p2", 3000, 200000)
+	pods[1] = buildTestPod("p2", 3000, 200000)
 	pods[1].OwnerReferences = GenerateOwnerReferences(ds.Name, "DaemonSet", "apps/v1", ds.UID)
 	podGroups := groupPodsBySchedulingProperties(pods)
 	assert.Equal(t, 2, len(podGroups))
+}
+
+func buildTestPod(name string, cpu, mem int64) *clustersnapshot.PodResourceInfo {
+	return &clustersnapshot.PodResourceInfo{Pod: BuildTestPod(name, cpu, mem)}
 }

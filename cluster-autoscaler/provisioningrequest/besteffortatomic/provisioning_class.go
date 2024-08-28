@@ -21,6 +21,7 @@ import (
 	apiv1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/klog/v2"
 
 	"k8s.io/autoscaler/cluster-autoscaler/apis/provisioningrequest/autoscaling.x-k8s.io/v1"
@@ -73,7 +74,7 @@ func (o *bestEffortAtomicProvClass) Initialize(
 
 // Provision returns success if there is, or has just been requested, sufficient capacity in the cluster for pods from ProvisioningRequest.
 func (o *bestEffortAtomicProvClass) Provision(
-	unschedulablePods []*apiv1.Pod,
+	unschedulablePods []*clustersnapshot.PodResourceInfo,
 	nodes []*apiv1.Node,
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
@@ -81,7 +82,7 @@ func (o *bestEffortAtomicProvClass) Provision(
 	if len(unschedulablePods) == 0 {
 		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
 	}
-	prs := provreqclient.ProvisioningRequestsForPods(o.client, unschedulablePods)
+	prs := provreqclient.ProvisioningRequestsForPods(o.client, clustersnapshot.ToPods(unschedulablePods))
 	prs = provreqclient.FilterOutProvisioningClass(prs, v1.ProvisioningClassBestEffortAtomicScaleUp)
 	if len(prs) == 0 {
 		return &status.ScaleUpStatus{Result: status.ScaleUpNotTried}, nil
@@ -134,8 +135,8 @@ func (o *bestEffortAtomicProvClass) Provision(
 	return st, nil
 }
 
-func (o *bestEffortAtomicProvClass) filterOutSchedulable(pods []*apiv1.Pod) ([]*apiv1.Pod, error) {
-	statuses, _, err := o.injector.TrySchedulePods(o.context.ClusterSnapshot, pods, scheduling.ScheduleAnywhere, false)
+func (o *bestEffortAtomicProvClass) filterOutSchedulable(pods []*clustersnapshot.PodResourceInfo) ([]*clustersnapshot.PodResourceInfo, error) {
+	statuses, _, err := o.injector.TrySchedulePods(o.context.ClusterSnapshot, clustersnapshot.ToPods(pods), scheduling.ScheduleAnywhere, false)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +146,7 @@ func (o *bestEffortAtomicProvClass) filterOutSchedulable(pods []*apiv1.Pod) ([]*
 		scheduledPods[status.Pod.UID] = true
 	}
 
-	var unschedulablePods []*apiv1.Pod
+	var unschedulablePods []*clustersnapshot.PodResourceInfo
 	for _, pod := range pods {
 		if !scheduledPods[pod.UID] {
 			unschedulablePods = append(unschedulablePods, pod)

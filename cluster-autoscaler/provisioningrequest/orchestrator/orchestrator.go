@@ -18,6 +18,7 @@ package orchestrator
 
 import (
 	"fmt"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 
 	appsv1 "k8s.io/api/apps/v1"
 	apiv1 "k8s.io/api/core/v1"
@@ -36,7 +37,7 @@ import (
 
 // ProvisioningClass is an interface for ProvisioningRequests.
 type ProvisioningClass interface {
-	Provision([]*apiv1.Pod, []*apiv1.Node, []*appsv1.DaemonSet,
+	Provision([]*clustersnapshot.PodResourceInfo, []*apiv1.Node, []*appsv1.DaemonSet,
 		map[string]*schedulerframework.NodeInfo) (*status.ScaleUpStatus, ca_errors.AutoscalerError)
 	Initialize(*context.AutoscalingContext, *ca_processors.AutoscalingProcessors, *clusterstate.ClusterStateRegistry,
 		estimator.EstimatorBuilder, taints.TaintConfig, *scheduling.HintingSimulator)
@@ -79,7 +80,7 @@ func (o *provReqOrchestrator) Initialize(
 // so only one ProvisioningClass return non empty scaleUp result.
 // In case we implement multiple ProvisioningRequest ScaleUp, the function should return combined status
 func (o *provReqOrchestrator) ScaleUp(
-	unschedulablePods []*apiv1.Pod,
+	unschedulablePods []*clustersnapshot.PodResourceInfo,
 	nodes []*apiv1.Node,
 	daemonSets []*appsv1.DaemonSet,
 	nodeInfos map[string]*schedulerframework.NodeInfo,
