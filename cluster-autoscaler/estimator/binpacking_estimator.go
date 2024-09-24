@@ -136,14 +136,14 @@ func (e *BinpackingNodeEstimator) tryToScheduleOnExistingNodes(
 		pod := pods[index]
 
 		// Check schedulability on all nodes created during simulation
-		nodeName, err := e.predicateChecker.FitsAnyNodeMatching(e.clusterSnapshot, pod.Pod, func(nodeInfo *schedulerframework.NodeInfo) bool {
+		nodeName, reservedPod, err := e.predicateChecker.FitsAnyNodeMatching(e.clusterSnapshot, pod, func(nodeInfo *schedulerframework.NodeInfo) bool {
 			return estimationState.newNodeNames[nodeInfo.Node().Name]
 		})
 		if err != nil {
 			break
 		}
 
-		if err := e.tryToAddNode(estimationState, pod, nodeName); err != nil {
+		if err := e.tryToAddNode(estimationState, reservedPod, nodeName); err != nil {
 			return nil, err
 		}
 	}
@@ -160,9 +160,9 @@ func (e *BinpackingNodeEstimator) tryToScheduleOnNewNodes(
 
 		if estimationState.lastNodeName != "" {
 			// Check schedulability on only newly created node
-			if err := e.predicateChecker.CheckPredicates(e.clusterSnapshot, pod.Pod, estimationState.lastNodeName); err == nil {
+			if err, reservedPod := e.predicateChecker.CheckPredicates(e.clusterSnapshot, pod, estimationState.lastNodeName); err == nil {
 				found = true
-				if err := e.tryToAddNode(estimationState, pod, estimationState.lastNodeName); err != nil {
+				if err := e.tryToAddNode(estimationState, reservedPod, estimationState.lastNodeName); err != nil {
 					return err
 				}
 			}
@@ -195,10 +195,11 @@ func (e *BinpackingNodeEstimator) tryToScheduleOnNewNodes(
 			// Note that this may still fail (ex. if topology spreading with zonal topologyKey is used);
 			// in this case we can't help the pending pod. We keep the node in clusterSnapshot to avoid
 			// adding and removing node to snapshot for each such pod.
-			if err := e.predicateChecker.CheckPredicates(e.clusterSnapshot, pod.Pod, estimationState.lastNodeName); err != nil {
+			err, reservedPod := e.predicateChecker.CheckPredicates(e.clusterSnapshot, pod, estimationState.lastNodeName)
+			if err != nil {
 				break
 			}
-			if err := e.tryToAddNode(estimationState, pod, estimationState.lastNodeName); err != nil {
+			if err := e.tryToAddNode(estimationState, reservedPod, estimationState.lastNodeName); err != nil {
 				return err
 			}
 		}

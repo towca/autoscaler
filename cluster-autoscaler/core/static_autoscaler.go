@@ -262,6 +262,9 @@ func (a *StaticAutoscaler) cleanUpIfRequired() {
 func (a *StaticAutoscaler) initializeClusterSnapshot(nodes []*apiv1.Node, scheduledPods []*apiv1.Pod) caerrors.AutoscalerError {
 	a.ClusterSnapshot.Clear()
 
+	a.ClusterSnapshot.SetGlobalResourceSlices(a.ClusterSnapshot.DraObjectsSource.NonNodeLocalResourceSlices)
+	a.ClusterSnapshot.SetAllResourceClaims(a.ClusterSnapshot.DraObjectsSource.AllResourceClaims())
+	a.ClusterSnapshot.SetAllDeviceClasses(a.ClusterSnapshot.DraObjectsSource.DeviceClasses)
 	knownNodes := make(map[string]bool)
 	for _, node := range nodes {
 		if err := a.ClusterSnapshot.AddNode(clustersnapshot.NewNodeResourceInfo(node, a.ClusterSnapshot.DraObjectsSource)); err != nil {

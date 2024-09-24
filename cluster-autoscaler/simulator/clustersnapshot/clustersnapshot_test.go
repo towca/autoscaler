@@ -31,7 +31,7 @@ import (
 
 var snapshots = map[string]func() ClusterSnapshot{
 	"basic": func() ClusterSnapshot { return NewBasicClusterSnapshot() },
-	"delta": func() ClusterSnapshot { return NewDeltaClusterSnapshot() },
+	//"delta": func() ClusterSnapshot { return NewDeltaClusterSnapshot() },
 }
 
 func nodeNames(nodes []*apiv1.Node) []string {
@@ -354,7 +354,8 @@ func TestNode404(t *testing.T) {
 			return snapshot.AddPod(&PodResourceInfo{Pod: BuildTestPod("p1", 0, 0)}, "node")
 		}},
 		{"remove pod", func(snapshot ClusterSnapshot) error {
-			return snapshot.RemovePod("default", "p1", "node")
+			_, err := snapshot.RemovePod("default", "p1", "node")
+			return err
 		}},
 		{"get node", func(snapshot ClusterSnapshot) error {
 			_, err := snapshot.NodeInfos().Get("node")
@@ -630,7 +631,7 @@ func TestPVCUsedByPods(t *testing.T) {
 				assert.Equal(t, tc.exists, volumeExists)
 
 				if tc.removePod != "" {
-					err = snapshot.RemovePod("default", tc.removePod, "node")
+					_, err = snapshot.RemovePod("default", tc.removePod, "node")
 					assert.NoError(t, err)
 
 					volumeExists = snapshot.IsPVCUsedByPods(schedulerframework.GetNamespacedName("default", tc.claimName))

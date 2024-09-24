@@ -55,7 +55,7 @@ func InitializeClusterSnapshotWithDynamicResourcesOrDie(t *testing.T, snapshot C
 			err = snapshot.AddPod(pod, pod.Pod.Status.NominatedNodeName)
 			assert.NoError(t, err, "error while adding pod %s/%s to nominated node %s", pod.Pod.Namespace, pod.Pod.Name, pod.Pod.Status.NominatedNodeName)
 		} else {
-			assert.Fail(t, "pod %s/%s does not have Spec.NodeName nor Status.NominatedNodeName set", pod.Pod.Namespace, pod.Pod.Name)
+			assert.Failf(t, "", "pod %s/%s does not have Spec.NodeName nor Status.NominatedNodeName set", pod.Pod.Namespace, pod.Pod.Name)
 		}
 	}
 }

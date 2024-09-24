@@ -20,7 +20,6 @@ import (
 	"fmt"
 	"time"
 
-	apiv1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/apis/provisioningrequest/autoscaling.x-k8s.io/v1"
@@ -45,7 +44,7 @@ const (
 )
 
 type injector interface {
-	TrySchedulePods(clusterSnapshot *clustersnapshot.Handle, pods []*apiv1.Pod, isNodeAcceptable func(*framework.NodeInfo) bool, breakOnFailure bool) ([]scheduling.Status, int, error)
+	TrySchedulePods(clusterSnapshot *clustersnapshot.Handle, pods []*clustersnapshot.PodResourceInfo, isNodeAcceptable func(*framework.NodeInfo) bool, breakOnFailure bool) ([]scheduling.Status, int, error)
 }
 
 type provReqProcessor struct {
@@ -140,7 +139,7 @@ func (p *provReqProcessor) bookCapacity(ctx *context.AutoscalingContext) error {
 	if err != nil {
 		return fmt.Errorf("couldn't fetch ProvisioningRequests in the cluster: %v", err)
 	}
-	podsToCreate := []*apiv1.Pod{}
+	var podsToCreate []*clustersnapshot.PodResourceInfo
 	for _, provReq := range provReqs {
 		if !conditions.ShouldCapacityBeBooked(provReq) {
 			continue
@@ -156,7 +155,9 @@ func (p *provReqProcessor) bookCapacity(ctx *context.AutoscalingContext) error {
 			}
 			continue
 		}
-		podsToCreate = append(podsToCreate, pods...)
+		for _, pod := range pods {
+			podsToCreate = append(podsToCreate, &clustersnapshot.PodResourceInfo{Pod: pod})
+		}
 	}
 	if len(podsToCreate) == 0 {
 		return nil

@@ -18,8 +18,11 @@ package clustersnapshot
 
 import (
 	"errors"
+	"fmt"
 
 	apiv1 "k8s.io/api/core/v1"
+	resourceapi "k8s.io/api/resource/v1alpha3"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/autoscaler/cluster-autoscaler/dynamicresources"
 	"k8s.io/klog/v2"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
@@ -42,6 +45,25 @@ func (p *PodResourceInfo) DeepCopy() *PodResourceInfo {
 		Pod:                     p.Pod.DeepCopy(),
 		DynamicResourceRequests: p.DynamicResourceRequests.DeepCopy(),
 	}
+}
+
+func (p *PodResourceInfo) AllocateClaims(allocatedClaims map[types.UID]*resourceapi.ResourceClaim) (*PodResourceInfo, error) {
+	result := p.DeepCopy()
+	allocated := 0
+	for i, claim := range result.DynamicResourceRequests.ResourceClaims {
+		if claim, found := allocatedClaims[claim.UID]; found {
+			err := dynamicresources.AddPodReservationIfNeededInPlace(claim, p.Pod)
+			if err != nil {
+				return nil, err
+			}
+			result.DynamicResourceRequests.ResourceClaims[i] = claim
+			allocated++
+		}
+	}
+	if allocated != len(allocatedClaims) {
+		return nil, fmt.Errorf("some claims not found in the pod")
+	}
+	return result, nil
 }
 
 // NewNodeResourceInfo combines a node with its associated DRA objects.
@@ -77,6 +99,7 @@ func NewNodeInfo(node *NodeResourceInfo, pods []*PodResourceInfo) *schedulerfram
 // It exposes mutation methods and can be viewed as scheduler's SharedLister.
 type ClusterSnapshot interface {
 	schedulerframework.SharedLister
+	schedulerframework.SharedDraManager
 	// AddNode adds node to the snapshot.
 	AddNode(node *NodeResourceInfo) error
 	// AddNodes adds nodes to the snapshot.
@@ -86,11 +109,19 @@ type ClusterSnapshot interface {
 	// AddPod adds pod to the snapshot and schedules it to given node.
 	AddPod(pod *PodResourceInfo, nodeName string) error
 	// RemovePod removes a pod (as well as all associated info like its dynamic resource requests) from the snapshot.
-	RemovePod(namespace string, podName string, nodeName string) error
+	RemovePod(namespace string, podName string, nodeName string) (*PodResourceInfo, error)
 	// AddNodeWithPods adds a node and set of pods to be scheduled to this node to the snapshot.
 	AddNodeWithPods(node *NodeResourceInfo, pods []*PodResourceInfo) error
 	// IsPVCUsedByPods returns if the pvc is used by any pod, key = <namespace>/<pvc_name>
 	IsPVCUsedByPods(key string) bool
+
+	SetGlobalResourceSlices(slices []*resourceapi.ResourceSlice)
+	SetAllResourceClaims(claims []*resourceapi.ResourceClaim)
+
+	GetResourceClaimAllocations() map[types.UID]*resourceapi.ResourceClaim
+	ClearResourceClaimAllocations()
+
+	SetAllDeviceClasses(classes []*resourceapi.DeviceClass)
 
 	// Fork creates a fork of snapshot state. All modifications can later be reverted to moment of forking via Revert().
 	// Use WithForkedSnapshot() helper function instead if possible.

@@ -100,11 +100,11 @@ func (p *filterOutSchedulablePodListProcessor) filterOutSchedulableByPacking(uns
 		return corev1helpers.PodPriority(unschedulableCandidates[i].Pod) > corev1helpers.PodPriority(unschedulableCandidates[j].Pod)
 	})
 
-	// TODO(DRA): Stop casting to naked Pods after ScaleUp works on PodResourceInfos.
-	statuses, overflowingControllerCount, err := p.schedulingSimulator.TrySchedulePods(clusterSnapshot, clustersnapshot.ToPods(unschedulableCandidates), p.nodeFilter, false)
+	statuses, overflowingControllerCount, err := p.schedulingSimulator.TrySchedulePods(clusterSnapshot, unschedulableCandidates, p.nodeFilter, false)
 	if err != nil {
 		return nil, err
 	}
+	klog.Warningf("%s", statuses)
 
 	scheduledPods := make(map[types.UID]bool)
 	for _, status := range statuses {

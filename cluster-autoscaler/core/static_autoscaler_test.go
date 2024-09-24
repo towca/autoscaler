@@ -38,6 +38,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaledown/actuation"
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaledown/deletiontracker"
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaledown/legacy"
+	"k8s.io/autoscaler/cluster-autoscaler/core/scaledown/planner"
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaledown/status"
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaleup/orchestrator"
 	. "k8s.io/autoscaler/cluster-autoscaler/core/test"
@@ -46,7 +47,6 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/estimator"
 	"k8s.io/autoscaler/cluster-autoscaler/observers/loopstart"
 	ca_processors "k8s.io/autoscaler/cluster-autoscaler/processors"
-	"k8s.io/autoscaler/cluster-autoscaler/processors/callbacks"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/nodegroupconfig"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/nodegroups/asyncnodegroups"
 	"k8s.io/autoscaler/cluster-autoscaler/processors/scaledowncandidates"
@@ -199,6 +199,10 @@ type commonMocks struct {
 	daemonSetLister           *daemonSetListerMock
 	nodeDeletionTracker       *deletiontracker.NodeDeletionTracker
 
+	resourceClaimLister *fakeResourceClaimLister
+	resourceSliceLister *fakeResourceSliceLister
+	deviceClassLister   *fakeDeviceClassLister
+
 	onScaleUp   *onScaleUpMock
 	onScaleDown *onScaleDownMock
 }
@@ -212,16 +216,20 @@ func newCommonMocks() *commonMocks {
 		daemonSetLister:           &daemonSetListerMock{},
 		onScaleUp:                 &onScaleUpMock{},
 		onScaleDown:               &onScaleDownMock{},
+		resourceClaimLister:       &fakeResourceClaimLister{},
+		resourceSliceLister:       &fakeResourceSliceLister{},
+		deviceClassLister:         &fakeDeviceClassLister{},
 	}
 }
 
 type autoscalerSetupConfig struct {
-	nodeGroups          []*nodeGroup
-	nodeStateUpdateTime time.Time
-	autoscalingOptions  config.AutoscalingOptions
-	clusterStateConfig  clusterstate.ClusterStateRegistryConfig
-	mocks               *commonMocks
-	nodesDeleted        chan bool
+	nodeGroups             []*nodeGroup
+	nodeStateUpdateTime    time.Time
+	autoscalingOptions     config.AutoscalingOptions
+	optionsBlockDefaulting bool
+	clusterStateConfig     clusterstate.ClusterStateRegistryConfig
+	mocks                  *commonMocks
+	nodesDeleted           chan bool
 }
 
 func setupCloudProvider(config *autoscalerSetupConfig) (*testprovider.TestCloudProvider, error) {
@@ -247,12 +255,13 @@ func setupCloudProvider(config *autoscalerSetupConfig) (*testprovider.TestCloudP
 	return provider, nil
 }
 
-func setupAutoscalingContext(opts config.AutoscalingOptions, provider cloudprovider.CloudProvider, processorCallbacks callbacks.ProcessorCallbacks) (context.AutoscalingContext, error) {
-	context, err := NewScaleTestAutoscalingContext(opts, &fake.Clientset{}, nil, provider, processorCallbacks, nil)
-	if err != nil {
-		return context, err
-	}
-	return context, nil
+func applySaneDefaultOpts(ctx *context.AutoscalingContext) {
+	ctx.AutoscalingOptions.MaxScaleDownParallelism = 10
+	ctx.AutoscalingOptions.MaxDrainParallelism = 1
+	ctx.AutoscalingOptions.NodeDeletionBatcherInterval = 0 * time.Second
+	ctx.AutoscalingOptions.NodeDeleteDelayAfterTaint = 1 * time.Second
+	ctx.AutoscalingOptions.SkipNodesWithSystemPods = true
+	ctx.AutoscalingOptions.SkipNodesWithLocalStorage = true
 }
 
 func setupAutoscaler(config *autoscalerSetupConfig) (*StaticAutoscaler, error) {
@@ -266,44 +275,47 @@ func setupAutoscaler(config *autoscalerSetupConfig) (*StaticAutoscaler, error) {
 		allNodes = append(allNodes, ng.nodes...)
 	}
 
-	// Create context with mocked lister registry.
+	// Create all necessary autoscaler dependencies, applying the mocks from config.
 	processorCallbacks := newStaticAutoscalerProcessorCallbacks()
-
-	context, err := setupAutoscalingContext(config.autoscalingOptions, provider, processorCallbacks)
-
+	listerRegistry := kube_util.NewListerRegistry(config.mocks.allNodeLister, config.mocks.readyNodeLister, config.mocks.allPodLister,
+		config.mocks.podDisruptionBudgetLister, config.mocks.daemonSetLister, nil, nil, nil, nil)
+	ctx, err := NewScaleTestAutoscalingContext(config.autoscalingOptions, &fake.Clientset{}, listerRegistry, provider, processorCallbacks, nil)
 	if err != nil {
 		return nil, err
 	}
+	if !config.optionsBlockDefaulting {
+		// Apply sane default options that make testing scale-down etc. possible - if not explicitly stated in the config that this is not desired.
+		applySaneDefaultOpts(&ctx)
+	}
 
-	setUpScaleDownActuator(&context, config.autoscalingOptions)
-
-	listerRegistry := kube_util.NewListerRegistry(config.mocks.allNodeLister, config.mocks.readyNodeLister, config.mocks.allPodLister,
-		config.mocks.podDisruptionBudgetLister, config.mocks.daemonSetLister,
-		nil, nil, nil, nil)
-	context.ListerRegistry = listerRegistry
-
-	ngConfigProcesssor := nodegroupconfig.NewDefaultNodeGroupConfigProcessor(config.autoscalingOptions.NodeGroupDefaults)
-
-	processors := NewTestProcessors(&context)
-
-	clusterState := clusterstate.NewClusterStateRegistry(provider, config.clusterStateConfig, context.LogRecorder, NewBackoff(), ngConfigProcesssor, processors.AsyncNodeGroupStateChecker)
-
+	processors := NewTestProcessors(&ctx)
+	clusterState := clusterstate.NewClusterStateRegistry(provider, config.clusterStateConfig, ctx.LogRecorder, NewBackoff(), processors.NodeGroupConfigProcessor, processors.AsyncNodeGroupStateChecker)
 	clusterState.UpdateNodes(allNodes, nil, config.nodeStateUpdateTime)
+	processors.ScaleStateNotifier.Register(clusterState)
 
-	sdPlanner, sdActuator := newScaleDownPlannerAndActuator(&context, processors, clusterState, config.mocks.nodeDeletionTracker)
 	suOrchestrator := orchestrator.New()
+	suOrchestrator.Initialize(&ctx, processors, clusterState, newEstimatorBuilder(), taints.TaintConfig{})
 
-	suOrchestrator.Initialize(&context, processors, clusterState, newEstimatorBuilder(), taints.TaintConfig{})
+	deleteOptions := options.NewNodeDeleteOptions(ctx.AutoscalingOptions)
+	drainabilityRules := rules.Default(deleteOptions)
+	draProvider := dynamicresources.NewProvider(config.mocks.resourceClaimLister, config.mocks.resourceSliceLister, config.mocks.deviceClassLister)
+	nodeDeletionTracker := config.mocks.nodeDeletionTracker
+	if nodeDeletionTracker == nil {
+		nodeDeletionTracker = deletiontracker.NewNodeDeletionTracker(0 * time.Second)
+	}
+	ctx.ScaleDownActuator = actuation.NewActuator(&ctx, clusterState, nodeDeletionTracker, deleteOptions, drainabilityRules, processors.NodeGroupConfigProcessor, draProvider)
+	sdPlanner := planner.New(&ctx, processors, deleteOptions, drainabilityRules)
 
 	autoscaler := &StaticAutoscaler{
-		AutoscalingContext:   &context,
+		AutoscalingContext:   &ctx,
 		clusterStateRegistry: clusterState,
 		scaleDownPlanner:     sdPlanner,
-		scaleDownActuator:    sdActuator,
+		scaleDownActuator:    ctx.ScaleDownActuator,
 		scaleUpOrchestrator:  suOrchestrator,
 		processors:           processors,
 		loopStartNotifier:    loopstart.NewObserversList(nil),
 		processorCallbacks:   processorCallbacks,
+		draProvider:          draProvider,
 	}
 
 	return autoscaler, nil
@@ -867,7 +879,7 @@ func TestStaticAutoscalerRunOnceWithAutoprovisionedEnabled(t *testing.T) {
 	podDisruptionBudgetListerMock.On("List").Return([]*policyv1.PodDisruptionBudget{}, nil).Twice()
 	daemonSetListerMock.On("List", labels.Everything()).Return([]*appsv1.DaemonSet{}, nil).Once()
 	onNodeGroupDeleteMock.On("Delete", "autoprovisioned-"+
-		"TN1").Return(nil).Once()
+			"TN1").Return(nil).Once()
 	onScaleDownMock.On("ScaleDown", "autoprovisioned-TN2", "n2").Return(nil).Once()
 
 	err = autoscaler.RunOnce(time.Now().Add(2 * time.Hour))
@@ -2502,7 +2514,7 @@ func TestStaticAutoscalerRunOnceInvokesScaleDownStatusProcessor(t *testing.T) {
 			pods:  []*apiv1.Pod{utilizedPod},
 			nodes: []*apiv1.Node{n1},
 			expectedStatus: &status.ScaleDownStatus{
-				Result:          status.ScaleDownNoUnneeded,
+				Result:          status.ScaleDownNoNodeDeleted,
 				ScaledDownNodes: []*status.ScaleDownNode{},
 				UnremovableNodes: []*status.UnremovableNode{
 					{
@@ -2550,7 +2562,7 @@ func TestStaticAutoscalerRunOnceInvokesScaleDownStatusProcessor(t *testing.T) {
 			}},
 			fakeDeletionResultsNodeGroup: "ng1",
 			expectedStatus: &status.ScaleDownStatus{
-				Result:          status.ScaleDownNoUnneeded,
+				Result:          status.ScaleDownNoNodeDeleted,
 				ScaledDownNodes: []*status.ScaleDownNode{},
 				UnremovableNodes: []*status.UnremovableNode{
 					{

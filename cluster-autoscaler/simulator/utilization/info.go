@@ -18,6 +18,8 @@ package utilization
 
 import (
 	"fmt"
+	resourceapi "k8s.io/api/resource/v1alpha3"
+	"k8s.io/autoscaler/cluster-autoscaler/dynamicresources"
 	"time"
 
 	"k8s.io/autoscaler/cluster-autoscaler/cloudprovider"
@@ -34,9 +36,10 @@ import (
 
 // Info contains utilization information for a node.
 type Info struct {
-	CpuUtil float64
-	MemUtil float64
-	GpuUtil float64
+	CpuUtil             float64
+	MemUtil             float64
+	GpuUtil             float64
+	DynamicResourceUtil float64
 	// Resource name of highest utilization resource
 	ResourceName apiv1.ResourceName
 	// Max(CpuUtil, MemUtil) or GpuUtils
@@ -57,6 +60,15 @@ func Calculate(nodeInfo *schedulerframework.NodeInfo, skipDaemonSetPods, skipMir
 		}
 		// Skips cpu and memory utilization calculation for node with GPU.
 		return Info{GpuUtil: gpuUtil, ResourceName: gpuConfig.ResourceName, Utilization: gpuUtil}, err
+	}
+
+	if len(nodeInfo.DynamicResources().ResourceSlices) > 0 {
+		dynamicUtils, err := CalculateDynamicResourceUtils(nodeInfo)
+		if err != nil {
+			return Info{}, err
+		}
+		resourceName, highestUtil := highestDynamicResourceUtil(dynamicUtils)
+		return Info{DynamicResourceUtil: highestUtil, ResourceName: resourceName}, nil
 	}
 
 	cpu, err := CalculateUtilizationOfResource(nodeInfo, apiv1.ResourceCPU, skipDaemonSetPods, skipMirrorPods, currentTime)
@@ -123,4 +135,59 @@ func CalculateUtilizationOfResource(nodeInfo *schedulerframework.NodeInfo, resou
 	}
 
 	return float64(podsRequest.MilliValue()) / float64(nodeAllocatable.MilliValue()-daemonSetAndMirrorPodsUtilization.MilliValue()), nil
+}
+
+func CalculateDynamicResourceUtils(nodeInfo *schedulerframework.NodeInfo) (map[string]map[string]float64, error) {
+	result := map[string]map[string]float64{}
+	claims := dynamicresources.NodeInfoResourceClaims(nodeInfo)
+	allocatedDevices := dynamicresources.GroupAllocatedDevices(claims)
+	for driverName, slicesByPool := range dynamicresources.GroupSlices(nodeInfo.DynamicResources().ResourceSlices) {
+		result[driverName] = map[string]float64{}
+		for poolName, poolSlices := range slicesByPool {
+			currentSlices, err := dynamicresources.AllCurrentGenSlices(poolSlices)
+			if err != nil {
+				return nil, fmt.Errorf("pool %q error: %v", poolName, err)
+			}
+			poolDevices := dynamicresources.GetAllDevices(currentSlices)
+			allocatedDeviceNames := allocatedDevices[driverName][poolName]
+			unallocated, allocated := splitDevicesByAllocation(poolDevices, allocatedDeviceNames)
+			result[driverName][poolName] = calculatePoolUtil(unallocated, allocated)
+		}
+	}
+	return result, nil
+}
+
+func highestDynamicResourceUtil(utils map[string]map[string]float64) (apiv1.ResourceName, float64) {
+	highestUtil := 0.0
+	var highestResourceName apiv1.ResourceName
+	for driverName, utilsByPool := range utils {
+		for poolName, util := range utilsByPool {
+			if util >= highestUtil {
+				highestUtil = util
+				highestResourceName = apiv1.ResourceName(driverName + "/" + poolName)
+			}
+		}
+	}
+	return highestResourceName, highestUtil
+}
+
+func calculatePoolUtil(unallocated, allocated []resourceapi.Device) float64 {
+	numAllocated := float64(len(allocated))
+	numUnallocated := float64(len(unallocated))
+	return numAllocated / (numAllocated + numUnallocated)
+}
+
+func splitDevicesByAllocation(devices []resourceapi.Device, allocatedNames []string) (unallocated, allocated []resourceapi.Device) {
+	allocatedNamesSet := map[string]bool{}
+	for _, allocatedName := range allocatedNames {
+		allocatedNamesSet[allocatedName] = true
+	}
+	for _, device := range devices {
+		if allocatedNamesSet[device.Name] {
+			allocated = append(allocated, device)
+		} else {
+			unallocated = append(unallocated, device)
+		}
+	}
+	return unallocated, allocated
 }

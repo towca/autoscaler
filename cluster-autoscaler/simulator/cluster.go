@@ -28,6 +28,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/scheduling"
 	"k8s.io/autoscaler/cluster-autoscaler/utils/drain"
 	kube_util "k8s.io/autoscaler/cluster-autoscaler/utils/kubernetes"
+	"k8s.io/autoscaler/cluster-autoscaler/utils/tpu"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 
 	apiv1 "k8s.io/api/core/v1"
@@ -153,7 +154,6 @@ func (r *RemovalSimulator) SimulateNodeRemoval(
 		klog.Errorf("Can't retrieve node %s from snapshot, err: %v", nodeName, err)
 	}
 	klog.V(2).Infof("Simulating node %s removal", nodeName)
-
 	podsToRemove, daemonSetPods, blockingPod, err := GetPodsToMove(nodeInfo, r.deleteOptions, r.drainabilityRules, r.listers, remainingPdbTracker, timestamp)
 	if err != nil {
 		klog.V(2).Infof("node %s cannot be removed: %v", nodeName, err)
@@ -173,8 +173,8 @@ func (r *RemovalSimulator) SimulateNodeRemoval(
 	klog.V(2).Infof("node %s may be removed", nodeName)
 	return &NodeToBeRemoved{
 		Node:             nodeInfo.Node(),
-		PodsToReschedule: podsToRemove,
-		DaemonSetPods:    daemonSetPods,
+		PodsToReschedule: clustersnapshot.ToPods(podsToRemove),
+		DaemonSetPods:    clustersnapshot.ToPods(daemonSetPods),
 	}, nil
 }
 
@@ -212,35 +212,29 @@ func (r *RemovalSimulator) withForkedSnapshot(f func() error) (err error) {
 	return err
 }
 
-func (r *RemovalSimulator) findPlaceFor(removedNode string, pods []*apiv1.Pod, nodes map[string]bool, timestamp time.Time) error {
+func (r *RemovalSimulator) findPlaceFor(removedNode string, pods []*clustersnapshot.PodResourceInfo, nodes map[string]bool, timestamp time.Time) error {
 	isCandidateNode := func(nodeInfo *schedulerframework.NodeInfo) bool {
 		return nodeInfo.Node().Name != removedNode && nodes[nodeInfo.Node().Name]
 	}
 
-	// TODO(DRA): Uncomment once RemovalSimulator is migrated to use PodResourceInfos.
-	//pods = tpu.ClearTPURequests(pods)
-
+	pods = tpu.ClearTPURequests(pods)
+	var deallocatedPods []*clustersnapshot.PodResourceInfo
 	// remove pods from clusterSnapshot first
 	for _, pod := range pods {
-		if err := r.clusterSnapshot.RemovePod(pod.Namespace, pod.Name, removedNode); err != nil {
+		if deallocatedPod, err := r.clusterSnapshot.RemovePod(pod.Namespace, pod.Name, removedNode); err != nil {
 			// just log error
 			klog.Errorf("Simulating removal of %s/%s return error; %v", pod.Namespace, pod.Name, err)
+		} else {
+			deallocatedPods = append(deallocatedPods, deallocatedPod)
 		}
 	}
 
-	newpods := make([]*apiv1.Pod, 0, len(pods))
-	for _, podptr := range pods {
-		newpod := *podptr
-		newpod.Spec.NodeName = ""
-		newpods = append(newpods, &newpod)
-	}
-
-	statuses, _, err := r.schedulingSimulator.TrySchedulePods(r.clusterSnapshot, newpods, isCandidateNode, true)
+	statuses, _, err := r.schedulingSimulator.TrySchedulePods(r.clusterSnapshot, deallocatedPods, isCandidateNode, true)
 	if err != nil {
 		return err
 	}
-	if len(statuses) != len(newpods) {
-		return fmt.Errorf("can reschedule only %d out of %d pods", len(statuses), len(newpods))
+	if len(statuses) != len(deallocatedPods) {
+		return fmt.Errorf("can reschedule only %d out of %d pods", len(statuses), len(deallocatedPods))
 	}
 
 	for _, status := range statuses {

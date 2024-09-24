@@ -19,8 +19,8 @@ package simulator
 import (
 	"time"
 
-	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/autoscaler/cluster-autoscaler/core/scaledown/pdb"
+	"k8s.io/autoscaler/cluster-autoscaler/simulator/clustersnapshot"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/drainability"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/drainability/rules"
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/options"
@@ -38,7 +38,7 @@ import (
 // with dangling created-by annotation).
 // If listers is not nil it checks whether RC, DS, Jobs and RS that created
 // these pods still exist.
-func GetPodsToMove(nodeInfo *schedulerframework.NodeInfo, deleteOptions options.NodeDeleteOptions, drainabilityRules rules.Rules, listers kube_util.ListerRegistry, remainingPdbTracker pdb.RemainingPdbTracker, timestamp time.Time) (pods []*apiv1.Pod, daemonSetPods []*apiv1.Pod, blockingPod *drain.BlockingPod, err error) {
+func GetPodsToMove(nodeInfo *schedulerframework.NodeInfo, deleteOptions options.NodeDeleteOptions, drainabilityRules rules.Rules, listers kube_util.ListerRegistry, remainingPdbTracker pdb.RemainingPdbTracker, timestamp time.Time) (pods []*clustersnapshot.PodResourceInfo, daemonSetPods []*clustersnapshot.PodResourceInfo, blockingPod *drain.BlockingPod, err error) {
 	if drainabilityRules == nil {
 		drainabilityRules = rules.Default(deleteOptions)
 	}
@@ -51,18 +51,18 @@ func GetPodsToMove(nodeInfo *schedulerframework.NodeInfo, deleteOptions options.
 		Timestamp:           timestamp,
 	}
 	for _, podInfo := range nodeInfo.Pods {
-		pod := podInfo.Pod
-		status := drainabilityRules.Drainable(drainCtx, pod, nodeInfo)
+		status := drainabilityRules.Drainable(drainCtx, podInfo.Pod, nodeInfo)
+		resInfo := &clustersnapshot.PodResourceInfo{Pod: podInfo.Pod, DynamicResourceRequests: podInfo.DynamicResourceRequests}
 		switch status.Outcome {
 		case drainability.UndefinedOutcome, drainability.DrainOk:
-			if pod_util.IsDaemonSetPod(pod) {
-				daemonSetPods = append(daemonSetPods, pod)
+			if pod_util.IsDaemonSetPod(podInfo.Pod) {
+				daemonSetPods = append(daemonSetPods, resInfo)
 			} else {
-				pods = append(pods, pod)
+				pods = append(pods, resInfo)
 			}
 		case drainability.BlockDrain:
 			return nil, nil, &drain.BlockingPod{
-				Pod:    pod,
+				Pod:    podInfo.Pod,
 				Reason: status.BlockingReason,
 			}, status.Error
 		}

@@ -9,15 +9,17 @@ import (
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
-type objectRef struct {
-	name      string
-	namespace string
+type ResourceClaimRef struct {
+	Name      string
+	Namespace string
 }
 
 // Snapshot contains a point-in-time view of all DRA-related objects that CA potentially needs to simulate.
 type Snapshot struct {
-	resourceClaimsByRef      map[objectRef]*resourceapi.ResourceClaim
-	resourceSlicesByNodeName map[string][]*resourceapi.ResourceSlice
+	resourceClaimsByRef        map[ResourceClaimRef]*resourceapi.ResourceClaim
+	resourceSlicesByNodeName   map[string][]*resourceapi.ResourceSlice
+	NonNodeLocalResourceSlices []*resourceapi.ResourceSlice
+	DeviceClasses              []*resourceapi.DeviceClass
 }
 
 func (s Snapshot) PodResourceRequests(pod *apiv1.Pod) schedulerframework.PodDynamicResourceRequests {
@@ -26,6 +28,7 @@ func (s Snapshot) PodResourceRequests(pod *apiv1.Pod) schedulerframework.PodDyna
 	for _, claimRef := range pod.Spec.ResourceClaims {
 		claim, err := s.claimForPod(pod, claimRef)
 		if err != nil {
+			klog.Warningf("%s", s.resourceClaimsByRef)
 			klog.Warningf("DRA: pod %s/%s, claim ref %q: error while determining DRA objects: %s", pod.Namespace, pod.Name, claimRef.Name, err)
 			continue
 		}
@@ -41,13 +44,21 @@ func (s Snapshot) NodeResources(node *apiv1.Node) schedulerframework.NodeDynamic
 	}
 }
 
+func (s Snapshot) AllResourceClaims() []*resourceapi.ResourceClaim {
+	var result []*resourceapi.ResourceClaim
+	for _, claim := range s.resourceClaimsByRef {
+		result = append(result, claim)
+	}
+	return result
+}
+
 func (s Snapshot) claimForPod(pod *apiv1.Pod, claimRef apiv1.PodResourceClaim) (*resourceapi.ResourceClaim, error) {
 	claimName := claimRefToName(pod, claimRef)
 	if claimName == "" {
 		return nil, fmt.Errorf("couldn't determine ResourceClaim name")
 	}
 
-	claim, found := s.resourceClaimsByRef[objectRef{name: claimName, namespace: pod.Namespace}]
+	claim, found := s.resourceClaimsByRef[ResourceClaimRef{Name: claimName, Namespace: pod.Namespace}]
 	if !found {
 		return nil, fmt.Errorf("couldn't find ResourceClaim %q", claimName)
 	}

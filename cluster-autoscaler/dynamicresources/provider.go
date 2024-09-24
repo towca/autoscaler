@@ -2,22 +2,28 @@ package dynamicresources
 
 import (
 	resourceapi "k8s.io/api/resource/v1alpha3"
-	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
-	resourceapilisters "k8s.io/client-go/listers/resource/v1alpha3"
-	"k8s.io/klog/v2"
 )
 
 // Provider provides DRA-related objects. Zero-value Provider object provides no objects, it can be used e.g. in tests.
 type Provider struct {
-	resourceClaims resourceapilisters.ResourceClaimLister
-	resourceSlices resourceapilisters.ResourceSliceLister
+	resourceClaims resourceClaimLister
+	resourceSlices resourceSliceLister
+	deviceClasses  deviceClassLister
 }
 
-func NewProvider(informerFactory informers.SharedInformerFactory) *Provider {
+func NewProviderFromInformers(informerFactory informers.SharedInformerFactory) *Provider {
+	claims := &resourceClaimApiLister{apiLister: informerFactory.Resource().V1alpha3().ResourceClaims().Lister()}
+	slices := &resourceSliceApiLister{apiLister: informerFactory.Resource().V1alpha3().ResourceSlices().Lister()}
+	devices := &deviceClassApiLister{apiLister: informerFactory.Resource().V1alpha3().DeviceClasses().Lister()}
+	return NewProvider(claims, slices, devices)
+}
+
+func NewProvider(claims resourceClaimLister, slices resourceSliceLister, classes deviceClassLister) *Provider {
 	return &Provider{
-		resourceClaims: informerFactory.Resource().V1alpha3().ResourceClaims().Lister(),
-		resourceSlices: informerFactory.Resource().V1alpha3().ResourceSlices().Lister(),
+		resourceClaims: claims,
+		resourceSlices: slices,
+		deviceClasses:  classes,
 	}
 }
 
@@ -27,30 +33,39 @@ func (p *Provider) Snapshot() (Snapshot, error) {
 		return Snapshot{}, nil
 	}
 
-	claims, err := p.resourceClaims.List(labels.Everything())
+	claims, err := p.resourceClaims.List()
 	if err != nil {
 		return Snapshot{}, err
 	}
-	claimMap := make(map[objectRef]*resourceapi.ResourceClaim)
+	claimMap := make(map[ResourceClaimRef]*resourceapi.ResourceClaim)
 	for _, claim := range claims {
-		claimMap[objectRef{name: claim.Name, namespace: claim.Namespace}] = claim
+		claimMap[ResourceClaimRef{Name: claim.Name, Namespace: claim.Namespace}] = claim
 	}
 
-	slices, err := p.resourceSlices.List(labels.Everything())
+	slices, err := p.resourceSlices.List()
+
 	if err != nil {
 		return Snapshot{}, err
 	}
 	slicesMap := make(map[string][]*resourceapi.ResourceSlice)
+	var nonNodeLocalSlices []*resourceapi.ResourceSlice
 	for _, slice := range slices {
 		if slice.Spec.NodeName == "" {
-			klog.Warningf("DRA: ignoring non-Node-local ResourceSlice %s/%s", slice.Namespace, slice.Name)
-			continue
+			nonNodeLocalSlices = append(nonNodeLocalSlices, slice)
+		} else {
+			slicesMap[slice.Spec.NodeName] = append(slicesMap[slice.Spec.NodeName], slice)
 		}
-		slicesMap[slice.Spec.NodeName] = append(slicesMap[slice.Spec.NodeName], slice)
+	}
+
+	classes, err := p.deviceClasses.List()
+	if err != nil {
+		return Snapshot{}, err
 	}
 
 	return Snapshot{
-		resourceClaimsByRef:      claimMap,
-		resourceSlicesByNodeName: slicesMap,
+		resourceClaimsByRef:        claimMap,
+		resourceSlicesByNodeName:   slicesMap,
+		NonNodeLocalResourceSlices: nonNodeLocalSlices,
+		DeviceClasses:              classes,
 	}, nil
 }

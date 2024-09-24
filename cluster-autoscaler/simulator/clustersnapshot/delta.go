@@ -19,6 +19,8 @@ package clustersnapshot
 import (
 	"fmt"
 
+	resourceapi "k8s.io/api/resource/v1alpha3"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
@@ -42,6 +44,45 @@ import (
 //		so basic caching doesn't help.
 type DeltaClusterSnapshot struct {
 	data *internalDeltaSnapshotData
+}
+
+func (snapshot *DeltaClusterSnapshot) ResourceClaims() schedulerframework.ResourceClaimTracker {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (snapshot *DeltaClusterSnapshot) ResourceSlices() schedulerframework.ResourceSliceLister {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (snapshot *DeltaClusterSnapshot) DeviceClasses() schedulerframework.DeviceClassLister {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (snapshot *DeltaClusterSnapshot) SetGlobalResourceSlices(slices []*resourceapi.ResourceSlice) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (snapshot *DeltaClusterSnapshot) SetAllResourceClaims(claims []*resourceapi.ResourceClaim) {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (snapshot *DeltaClusterSnapshot) GetResourceClaimAllocations() map[types.UID]*resourceapi.ResourceClaim {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (snapshot *DeltaClusterSnapshot) ClearResourceClaimAllocations() {
+	// TODO implement me
+	panic("implement me")
+}
+
+func (snapshot *DeltaClusterSnapshot) SetAllDeviceClasses(classes []*resourceapi.DeviceClass) {
+	panic("implement me")
 }
 
 type deltaSnapshotNodeLister DeltaClusterSnapshot
@@ -435,8 +476,8 @@ func (snapshot *DeltaClusterSnapshot) AddPod(pod *PodResourceInfo, nodeName stri
 }
 
 // RemovePod removes pod from the snapshot.
-func (snapshot *DeltaClusterSnapshot) RemovePod(namespace, podName, nodeName string) error {
-	return snapshot.data.removePod(namespace, podName, nodeName)
+func (snapshot *DeltaClusterSnapshot) RemovePod(namespace, podName, nodeName string) (*PodResourceInfo, error) {
+	return nil, snapshot.data.removePod(namespace, podName, nodeName)
 }
 
 // IsPVCUsedByPods returns if the pvc is used by any pod

@@ -160,7 +160,7 @@ func initializeDefaultOptions(opts *AutoscalerOptions, informerFactory informers
 		opts.DrainabilityRules = rules.Default(opts.DeleteOptions)
 	}
 	if opts.DraProvider == nil {
-		opts.DraProvider = dynamicresources.NewProvider(informerFactory)
+		opts.DraProvider = dynamicresources.NewProviderFromInformers(informerFactory)
 	}
 
 	return nil

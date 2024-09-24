@@ -136,7 +136,7 @@ func (o *bestEffortAtomicProvClass) Provision(
 }
 
 func (o *bestEffortAtomicProvClass) filterOutSchedulable(pods []*clustersnapshot.PodResourceInfo) ([]*clustersnapshot.PodResourceInfo, error) {
-	statuses, _, err := o.injector.TrySchedulePods(o.context.ClusterSnapshot, clustersnapshot.ToPods(pods), scheduling.ScheduleAnywhere, false)
+	statuses, _, err := o.injector.TrySchedulePods(o.context.ClusterSnapshot, pods, scheduling.ScheduleAnywhere, false)
 	if err != nil {
 		return nil, err
 	}

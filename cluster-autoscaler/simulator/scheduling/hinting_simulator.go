@@ -55,28 +55,28 @@ func NewHintingSimulator(predicateChecker predicatechecker.PredicateChecker) *Hi
 // after the first scheduling attempt that fails. This is useful if all provided
 // pods need to be scheduled.
 // Note: this function does not fork clusterSnapshot: this has to be done by the caller.
-func (s *HintingSimulator) TrySchedulePods(clusterSnapshot *clustersnapshot.Handle, pods []*apiv1.Pod, isNodeAcceptable func(*schedulerframework.NodeInfo) bool, breakOnFailure bool) ([]Status, int, error) {
+func (s *HintingSimulator) TrySchedulePods(clusterSnapshot *clustersnapshot.Handle, pods []*clustersnapshot.PodResourceInfo, isNodeAcceptable func(*schedulerframework.NodeInfo) bool, breakOnFailure bool) ([]Status, int, error) {
 	similarPods := NewSimilarPodsScheduling()
 
 	var statuses []Status
 	loggingQuota := klogx.PodsLoggingQuota()
 	for _, pod := range pods {
 		klogx.V(5).UpTo(loggingQuota).Infof("Looking for place for %s/%s", pod.Namespace, pod.Name)
-		nodeName, err := s.findNodeWithHints(clusterSnapshot, pod, isNodeAcceptable)
+		nodeName, reservedPod, err := s.findNodeWithHints(clusterSnapshot, pod, isNodeAcceptable)
 		if err != nil {
 			return nil, 0, err
 		}
 
 		if nodeName == "" {
-			nodeName = s.findNode(similarPods, clusterSnapshot, pod, loggingQuota, isNodeAcceptable)
+			nodeName, reservedPod = s.findNode(similarPods, clusterSnapshot, pod, loggingQuota, isNodeAcceptable)
 		}
 
 		if nodeName != "" {
 			klogx.V(4).UpTo(loggingQuota).Infof("Pod %s/%s can be moved to %s", pod.Namespace, pod.Name, nodeName)
-			if err := clusterSnapshot.AddPod(clustersnapshot.NewPodResourceInfo(pod, clusterSnapshot.DraObjectsSource), nodeName); err != nil {
+			if err := clusterSnapshot.AddPod(reservedPod, nodeName); err != nil {
 				return nil, 0, fmt.Errorf("simulating scheduling of %s/%s to %s return error; %v", pod.Namespace, pod.Name, nodeName, err)
 			}
-			statuses = append(statuses, Status{Pod: pod, NodeName: nodeName})
+			statuses = append(statuses, Status{Pod: pod.Pod, NodeName: nodeName})
 		} else if breakOnFailure {
 			break
 		}
@@ -85,40 +85,40 @@ func (s *HintingSimulator) TrySchedulePods(clusterSnapshot *clustersnapshot.Hand
 	return statuses, similarPods.OverflowingControllerCount(), nil
 }
 
-func (s *HintingSimulator) findNodeWithHints(clusterSnapshot clustersnapshot.ClusterSnapshot, pod *apiv1.Pod, isNodeAcceptable func(*schedulerframework.NodeInfo) bool) (string, error) {
-	hk := HintKeyFromPod(pod)
+func (s *HintingSimulator) findNodeWithHints(clusterSnapshot clustersnapshot.ClusterSnapshot, pod *clustersnapshot.PodResourceInfo, isNodeAcceptable func(*schedulerframework.NodeInfo) bool) (string, *clustersnapshot.PodResourceInfo, error) {
+	hk := HintKeyFromPod(pod.Pod)
 	if hintedNode, hasHint := s.hints.Get(hk); hasHint {
-		if err := s.predicateChecker.CheckPredicates(clusterSnapshot, pod, hintedNode); err == nil {
+		if err, reservedPod := s.predicateChecker.CheckPredicates(clusterSnapshot, pod, hintedNode); err == nil {
 			s.hints.Set(hk, hintedNode)
 
 			nodeInfo, err := clusterSnapshot.NodeInfos().Get(hintedNode)
 			if err != nil {
-				return "", err
+				return "", nil, err
 			}
 
 			if isNodeAcceptable(nodeInfo) {
-				return hintedNode, nil
+				return hintedNode, reservedPod, nil
 			}
 		}
 	}
-	return "", nil
+	return "", nil, nil
 }
 
-func (s *HintingSimulator) findNode(similarPods *SimilarPodsScheduling, clusterSnapshot clustersnapshot.ClusterSnapshot, pod *apiv1.Pod, loggingQuota *klogx.Quota, isNodeAcceptable func(*schedulerframework.NodeInfo) bool) string {
-	if similarPods.IsSimilarUnschedulable(pod) {
+func (s *HintingSimulator) findNode(similarPods *SimilarPodsScheduling, clusterSnapshot clustersnapshot.ClusterSnapshot, pod *clustersnapshot.PodResourceInfo, loggingQuota *klogx.Quota, isNodeAcceptable func(*schedulerframework.NodeInfo) bool) (string, *clustersnapshot.PodResourceInfo) {
+	if similarPods.IsSimilarUnschedulable(pod.Pod) {
 		klogx.V(4).UpTo(loggingQuota).Infof("failed to find place for %s/%s based on similar pods scheduling", pod.Namespace, pod.Name)
-		return ""
+		return "", nil
 	}
 
-	newNodeName, err := s.predicateChecker.FitsAnyNodeMatching(clusterSnapshot, pod, isNodeAcceptable)
+	newNodeName, reservedPod, err := s.predicateChecker.FitsAnyNodeMatching(clusterSnapshot, pod, isNodeAcceptable)
 	if err != nil {
 		klogx.V(4).UpTo(loggingQuota).Infof("failed to find place for %s/%s: %v", pod.Namespace, pod.Name, err)
-		similarPods.SetUnschedulable(pod)
-		return ""
+		similarPods.SetUnschedulable(pod.Pod)
+		return "", nil
 	}
 
-	s.hints.Set(HintKeyFromPod(pod), newNodeName)
-	return newNodeName
+	s.hints.Set(HintKeyFromPod(pod.Pod), newNodeName)
+	return newNodeName, reservedPod
 }
 
 // DropOldHints drops old scheduling hints.
