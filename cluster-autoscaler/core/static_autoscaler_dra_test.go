@@ -17,6 +17,7 @@ limitations under the License.
 package core
 
 import (
+	"flag"
 	"fmt"
 	"math"
 	"slices"
@@ -44,6 +45,7 @@ import (
 	"k8s.io/autoscaler/cluster-autoscaler/simulator/framework"
 	. "k8s.io/autoscaler/cluster-autoscaler/utils/test"
 	featuretesting "k8s.io/component-base/featuregate/testing"
+	"k8s.io/klog/v2"
 	"k8s.io/kubernetes/pkg/features"
 	schedconfig "k8s.io/kubernetes/pkg/scheduler/apis/config"
 	schedconfiglatest "k8s.io/kubernetes/pkg/scheduler/apis/config/latest"
@@ -74,9 +76,8 @@ var (
 			Namespace: "default",
 		},
 		Spec: resourceapi.DeviceClassSpec{
-			Selectors:     nil,
-			Config:        nil,
-			SuitableNodes: nil,
+			Selectors: nil,
+			Config:    nil,
 		},
 	}
 )
@@ -188,9 +189,9 @@ type noScaleDownDef struct {
 
 func TestStaticAutoscalerDynamicResources(t *testing.T) {
 	//// Uncomment to get logs from the DRA plugin.
-	//var fs flag.FlagSet
-	//klog.InitFlags(&fs)
-	//assert.NoError(t, fs.Set("v", "5"))
+	var fs flag.FlagSet
+	klog.InitFlags(&fs)
+	assert.NoError(t, fs.Set("v", "5"))
 
 	featuretesting.SetFeatureGateDuringTest(t, feature.DefaultFeatureGate, features.DynamicResourceAllocation, true)
 	schedConfig, err := schedconfiglatest.Default()
@@ -664,7 +665,7 @@ func testResourceClaim(claimName string, owningPod *apiv1.Pod, nodeName string, 
 		deviceRequest := resourceapi.DeviceRequest{
 			Name:            request.name,
 			DeviceClassName: "default-class",
-			AdminAccess:     false,
+			AdminAccess:     nil,
 			Selectors:       selectors,
 		}
 		if request.all {

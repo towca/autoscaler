@@ -21,12 +21,14 @@ import (
 
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/dynamic-resource-allocation/structured"
 	schedulerframework "k8s.io/kubernetes/pkg/scheduler/framework"
 )
 
 type SharedLister interface {
 	schedulerframework.SharedLister
-	schedulerframework.SharedDraManager
+	schedulerframework.SharedDRAManager
 }
 
 // DelegatingSchedulerSharedLister is an implementation of scheduler.SharedLister which
@@ -124,7 +126,7 @@ func (u unsetResourceClaimsTracker) List() ([]*resourceapi.ResourceClaim, error)
 	return nil, fmt.Errorf("lister not set in delegate")
 }
 
-func (u unsetResourceClaimsTracker) ListAllAllocated() ([]*resourceapi.ResourceClaim, error) {
+func (u unsetResourceClaimsTracker) ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error) {
 	return nil, fmt.Errorf("lister not set in delegate")
 }
 

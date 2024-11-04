@@ -21,6 +21,8 @@ import (
 
 	resourceapi "k8s.io/api/resource/v1alpha3"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/apimachinery/pkg/util/sets"
+	"k8s.io/dynamic-resource-allocation/structured"
 )
 
 type snapshotClaimTracker Snapshot
@@ -41,11 +43,13 @@ func (s snapshotClaimTracker) Get(namespace, claimName string) (*resourceapi.Res
 	return claim, nil
 }
 
-func (s snapshotClaimTracker) ListAllAllocated() ([]*resourceapi.ResourceClaim, error) {
-	var result []*resourceapi.ResourceClaim
+func (s snapshotClaimTracker) ListAllAllocatedDevices() (sets.Set[structured.DeviceID], error) {
+	result := sets.New[structured.DeviceID]()
 	for _, claim := range s.resourceClaimsByRef {
 		if ClaimAllocated(claim) {
-			result = append(result, claim)
+			for _, device := range claim.Status.Allocation.Devices.Results {
+				result.Insert(structured.MakeDeviceID(device.Driver, device.Pool, device.Device))
+			}
 		}
 	}
 	return result, nil

@@ -53,7 +53,7 @@ func NewHandle(informerFactory informers.SharedInformerFactory, schedConfig *con
 		schedulerframeworkruntime.WithSnapshotSharedLister(sharedLister),
 	}
 	if draEnabled {
-		opts = append(opts, schedulerframeworkruntime.WithSharedDraManager(sharedLister))
+		opts = append(opts, schedulerframeworkruntime.WithSharedDRAManager(sharedLister))
 	}
 
 	schedulermetrics.InitMetrics()

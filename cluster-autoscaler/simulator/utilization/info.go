@@ -28,7 +28,7 @@ import (
 
 	apiv1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
-	resourcehelper "k8s.io/kubernetes/pkg/api/v1/resource"
+	resourcehelper "k8s.io/component-helpers/resource"
 
 	klog "k8s.io/klog/v2"
 )
